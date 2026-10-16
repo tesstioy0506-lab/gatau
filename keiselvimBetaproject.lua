@@ -1,8 +1,8 @@
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
     ║                                                                      ║
-    ║           KEI SELVIM — UI SHELL v1.1                                 ║
-    ║           Modern Icon Edition (no emoji)                             ║
+    ║           KEI SELVIM — UI SHELL v2.1                                 ║
+    ║           Glassmorphism • Line Icons • State Buttons                 ║
     ║                                                                      ║
     ╚══════════════════════════════════════════════════════════════════════╝
 ]]
@@ -11,32 +11,49 @@
 -- THEME
 -- ═══════════════════════════════════════════════════════════════════════
 local THEME = {
-    BG_ASSET     = "rbxassetid://0",
+    BG_ASSET     = "rbxassetid://137253259807797",
 
-    -- Warna
-    ACCENT       = Color3.fromRGB(138, 43, 226),
-    ACCENT_DIM   = Color3.fromRGB(70, 25, 120),
-    ACCENT_GLOW  = Color3.fromRGB(170, 90, 245),
-    PANEL        = Color3.fromRGB(20, 20, 28),
-    PANEL_DARK   = Color3.fromRGB(12, 12, 18),
-    DANGER       = Color3.fromRGB(220, 60, 80),
-    SUCCESS      = Color3.fromRGB(100, 220, 140),
-    TEXT         = Color3.fromRGB(240, 240, 245),
-    TEXT_DIM     = Color3.fromRGB(150, 150, 175),
+    -- Warna inti
+    ACCENT       = Color3.fromRGB(150, 80, 240),
+    ACCENT_LITE  = Color3.fromRGB(180, 130, 255),
+    ACCENT_DIM   = Color3.fromRGB(60, 30, 105),
+    ACCENT_GLOW  = Color3.fromRGB(190, 140, 255),
+
+    -- Surface (default state)
+    SURFACE      = Color3.fromRGB(22, 22, 32),
+    SURFACE_2    = Color3.fromRGB(16, 16, 24),
+    SURFACE_3    = Color3.fromRGB(30, 30, 44),
+    BTN_IDLE     = Color3.fromRGB(38, 38, 52),     -- default tombol (abu gelap)
+    BTN_HOVER    = Color3.fromRGB(52, 52, 68),     -- hover idle
+    HAIRLINE     = Color3.fromRGB(255, 255, 255),
+
+    -- Text
+    TEXT         = Color3.fromRGB(245, 245, 250),
+    TEXT_DIM     = Color3.fromRGB(150, 150, 170),
+    TEXT_FAINT   = Color3.fromRGB(100, 100, 120),
+
+    -- Status
+    DANGER       = Color3.fromRGB(240, 80, 105),
+    SUCCESS      = Color3.fromRGB(100, 220, 150),
+    WARN         = Color3.fromRGB(255, 190, 90),
 
     -- Transparansi
-    BG_TRANS     = 0.2,
-    PANEL_TRANS  = 0.25,
-    BTN_TRANS    = 0.2,
+    BG_TRANS     = 0.15,
+    PANEL_TRANS  = 0.35,
+    BTN_TRANS    = 0.15,
+    HAIRLINE_TR  = 0.85,
 
     -- Ukuran
-    BASE_W       = 640,
-    BASE_H       = 420,
-    SIDEBAR_W    = 60,
-    HEADER_H     = 40,
-    PAD          = 12,
-    ICON_SIZE    = 38,
-    ICON_GAP     = 8,
+    BASE_W       = 660,
+    BASE_H       = 440,
+    SIDEBAR_W    = 64,
+    HEADER_H     = 44,
+    PAD          = 14,
+    ICON_SIZE    = 42,
+    ICON_GAP     = 6,
+    RADIUS_LG    = 16,
+    RADIUS_MD    = 10,
+    RADIUS_SM    = 6,
 }
 
 -- ═══════════════════════════════════════════════════════════════════════
@@ -105,6 +122,17 @@ local function stroke(parent, col, thick, trans)
     return s
 end
 
+local function gradient(parent, c1, c2, rot)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, c1),
+        ColorSequenceKeypoint.new(1, c2),
+    })
+    g.Rotation = rot or 90
+    g.Parent = parent
+    return g
+end
+
 local function label(parent, props)
     local l = Instance.new("TextLabel")
     l.BackgroundTransparency = 1
@@ -124,15 +152,18 @@ local function label(parent, props)
     return l
 end
 
-local function button(parent, props)
+-- ═══════════════════════════════════════════════════════════════════════
+-- STATEFUL BUTTON
+-- default = abu gelap, hover = abu terang, aktif (dipencet/dipilih) = ungu
+-- ═══════════════════════════════════════════════════════════════════════
+local ButtonState = {}  -- registry untuk reset state
+
+local function makeButton(parent, props)
     local b = Instance.new("TextButton")
     b.Name = props.Name or "Btn"
-    b.BackgroundColor3 = props.Color or THEME.ACCENT
+    b.BackgroundColor3 = props.IdleColor or THEME.BTN_IDLE
     b.BackgroundTransparency = props.Trans or THEME.BTN_TRANS
     b.Text = ""
-    b.TextColor3 = props.TextColor or Color3.fromRGB(255, 255, 255)
-    b.Font = props.Font or Enum.Font.GothamMedium
-    b.TextSize = props.TextSize or 13
     b.Size = props.FrameSize or UDim2.new(1, 0, 0, 36)
     b.Position = props.Pos or UDim2.new(0, 0, 0, 0)
     b.BorderSizePixel = 0
@@ -141,201 +172,256 @@ local function button(parent, props)
     b.Selectable = true
     b.ZIndex = props.Z or 10
     b.Parent = parent
-    corner(b, props.Radius or 8)
-    stroke(b, props.StrokeColor or THEME.ACCENT, props.StrokeThick or 1, props.StrokeTrans or 0.3)
+    corner(b, props.Radius or THEME.RADIUS_MD)
+    local s = stroke(b, props.StrokeColor or THEME.HAIRLINE, props.StrokeThick or 1, props.StrokeTrans or 0.88)
 
-    -- Text label di atas button (biar bisa multi-element)
+    -- Text
+    local textLabel = nil
     if props.Text and props.Text ~= "" then
-        label(b, {
+        textLabel = label(b, {
             Text = props.Text,
-            Color = props.TextColor or Color3.fromRGB(255, 255, 255),
-            Font = props.Font or Enum.Font.GothamMedium,
-            Size = props.TextSize or 13,
+            Color = props.TextColor or THEME.TEXT,
+            Font = props.Font or Enum.Font.GothamSemibold,
+            Size = props.TextSize or 12,
             FrameSize = UDim2.new(1, 0, 1, 0),
             XAlign = Enum.TextXAlignment.Center,
-            Z = (props.Z or 10) + 1,
+            Z = (props.Z or 10) + 2,
         })
     end
 
-    local baseColor = props.Color or THEME.ACCENT
-    local baseTrans = props.Trans or THEME.BTN_TRANS
-    b.MouseEnter:Connect(function()
-        TweenService:Create(b, TweenInfo.new(0.15), {
-            BackgroundColor3 = THEME.ACCENT_GLOW,
-            BackgroundTransparency = math.max(0, baseTrans - 0.1),
+    -- State
+    local isActive = false
+    local idleCol = props.IdleColor or THEME.BTN_IDLE
+    local idleTrans = props.Trans or THEME.BTN_TRANS
+    local activeCol = props.ActiveColor or THEME.ACCENT
+    local activeTrans = math.max(0, idleTrans - 0.05)
+    local hoverCol = props.HoverColor or THEME.BTN_HOVER
+
+    local function refresh(hovering)
+        local targetCol, targetTrans, targetStroke, targetTextCol
+        if isActive then
+            targetCol = activeCol
+            targetTrans = activeTrans
+            targetStroke = 0.15
+            targetTextCol = Color3.fromRGB(255, 255, 255)
+        elseif hovering then
+            targetCol = hoverCol
+            targetTrans = idleTrans
+            targetStroke = 0.6
+            targetTextCol = THEME.TEXT
+        else
+            targetCol = idleCol
+            targetTrans = idleTrans
+            targetStroke = 0.88
+            targetTextCol = props.TextColor or THEME.TEXT
+        end
+        TweenService:Create(b, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+            BackgroundColor3 = targetCol,
+            BackgroundTransparency = targetTrans,
         }):Play()
-    end)
-    b.MouseLeave:Connect(function()
-        TweenService:Create(b, TweenInfo.new(0.15), {
-            BackgroundColor3 = baseColor,
-            BackgroundTransparency = baseTrans,
-        }):Play()
-    end)
+        TweenService:Create(s, TweenInfo.new(0.18), { Transparency = targetStroke }):Play()
+        if textLabel then
+            TweenService:Create(textLabel, TweenInfo.new(0.18), { TextColor3 = targetTextCol }):Play()
+        end
+    end
+
+    b.MouseEnter:Connect(function() refresh(true) end)
+    b.MouseLeave:Connect(function() refresh(false) end)
+
+    -- API untuk set state aktif
+    b.SetActive = function(v)
+        isActive = v and true or false
+        refresh(false)
+    end
+    b.GetActive = function() return isActive end
 
     return b
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
--- ICON FACTORY — bikin icon line-style dari primitive shape
--- Semua icon digambar pakai Frame, bukan emoji/glyph
+-- ICON FACTORY — line-style tipis, di dalam holder
 -- ═══════════════════════════════════════════════════════════════════════
--- Setiap icon = function(parent, size, color) yang return Frame container
 local IconFactory = {}
 
--- Helper: bikin bar (line) di dalam parent
-local function bar(parent, size, pos, col, radius, rot)
+local function line(parent, size, pos, col, rot, r)
     local f = Instance.new("Frame")
     f.Size = size
     f.Position = pos
     f.BackgroundColor3 = col
     f.BorderSizePixel = 0
-    f.ZIndex = 20
+    f.ZIndex = 25
     f.Parent = parent
-    if radius then corner(f, radius) end
+    if r then corner(f, r) end
     if rot then f.Rotation = rot end
     return f
 end
 
--- 🏠 HOME → house outline (roof segitiga + body kotak)
-IconFactory.home = function(parent, size, col, z)
+-- Warna icon berubah menurut state tombol
+-- Factory signature: function(holder, size, color) -> container + list of icon parts
+
+-- HOME: atap segitiga outline + body kotak outline
+IconFactory.home = function(holder, size, col)
     local c = Instance.new("Frame")
     c.Size = UDim2.new(0, size, 0, size)
     c.BackgroundTransparency = 1
-    c.ZIndex = z or 20
-    c.Parent = parent
+    c.ZIndex = 24
+    c.Parent = holder
+    local parts = {}
 
     local s = size
-    -- body (kotak bawah)
-    bar(c, UDim2.new(0, s*0.7, 0, s*0.55),
-        UDim2.new(0.5, -s*0.35, 1, -s*0.6), col, 2)
-    -- roof (diamond diputar 45°, dipotong atas)
-    local roof = Instance.new("Frame")
-    roof.Size = UDim2.new(0, s*0.75, 0, s*0.75)
-    roof.Position = UDim2.new(0.5, -s*0.375, 0, s*0.05)
-    roof.BackgroundColor3 = col
-    roof.BorderSizePixel = 0
-    roof.Rotation = 45
-    roof.ZIndex = (z or 20)
-    roof.Parent = c
-    corner(roof, 3)
-    -- potong bawah roof pakai frame warna background (mask)
-    local mask = Instance.new("Frame")
-    mask.Size = UDim2.new(0, s*0.5, 0, s*0.4)
-    mask.Position = UDim2.new(0.5, -s*0.25, 0.5, 0)
-    mask.BackgroundColor3 = THEME.PANEL_DARK
-    mask.BackgroundTransparency = 0.35
-    mask.BorderSizePixel = 0
-    mask.ZIndex = (z or 20) + 1
-    mask.Parent = c
-    return c
+    local t = math.max(1.5, s * 0.09)
+
+    -- Body: 4 garis kotak
+    local bx, by = s*0.24, s*0.44
+    local bw, bh = s*0.52, s*0.44
+    parts[#parts+1] = line(c, UDim2.new(0, bw, 0, t), UDim2.new(0, bx, 0, by), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, bw, 0, t), UDim2.new(0, bx, 0, by+bh), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, t, 0, bh+t), UDim2.new(0, bx, 0, by), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, t, 0, bh+t), UDim2.new(0, bx+bw, 0, by), col, 0, 1)
+
+    -- Atap: segitiga dari 2 garis diagonal (bukan blok)
+    -- Bikin pakai rotated frames
+    local roofW = s * 0.4
+    local roofH = s * 0.28
+    local roofLeft = line(c,
+        UDim2.new(0, roofW, 0, t),
+        UDim2.new(0.5, -roofW, by - roofH + t/2, 0),
+        col, -35, 1)
+    local roofRight = line(c,
+        UDim2.new(0, roofW, 0, t),
+        UDim2.new(0.5, 0, by - roofH + t/2, 0),
+        col, 35, 1)
+    parts[#parts+1] = roofLeft
+    parts[#parts+1] = roofRight
+
+    return parts
 end
 
--- 🛠 TOOLS → wrench sederhana (garis diagonal + kepala)
-IconFactory.tools = function(parent, size, col, z)
+-- TOOLS: wrench — handle diagonal + kepala C
+IconFactory.tools = function(holder, size, col)
     local c = Instance.new("Frame")
     c.Size = UDim2.new(0, size, 0, size)
     c.BackgroundTransparency = 1
-    c.ZIndex = z or 20
-    c.Parent = parent
+    c.ZIndex = 24
+    c.Parent = holder
+    local parts = {}
 
     local s = size
-    -- handle diagonal
-    bar(c, UDim2.new(0, s*0.65, 0, s*0.14),
-        UDim2.new(0.15, 0, 0.5, -s*0.07), col, 3, -45)
-    -- kepala (kotak kecil di ujung atas)
-    local head = Instance.new("Frame")
-    head.Size = UDim2.new(0, s*0.35, 0, s*0.35)
-    head.Position = UDim2.new(0.5, 0, 0.05, 0)
-    head.BackgroundColor3 = col
-    head.BorderSizePixel = 0
-    head.Rotation = 45
-    head.ZIndex = (z or 20) + 1
-    head.Parent = c
-    corner(head, 3)
-    -- lubang tengah kepala
-    local hole = Instance.new("Frame")
-    hole.Size = UDim2.new(0, s*0.14, 0, s*0.14)
-    hole.Position = UDim2.new(0.5, -s*0.07, 0.5, -s*0.07)
-    hole.BackgroundColor3 = THEME.PANEL_DARK
-    hole.BackgroundTransparency = 0.35
-    hole.BorderSizePixel = 0
-    hole.ZIndex = (z or 20) + 2
-    hole.Parent = head
-    corner(hole, s)
-    return c
+    local t = math.max(1.5, s * 0.09)
+
+    -- Handle diagonal (dari tengah bawah ke atas kanan)
+    parts[#parts+1] = line(c,
+        UDim2.new(0, s*0.55, 0, t),
+        UDim2.new(0.18, 0, 0.55, -t/2),
+        col, -40, 1)
+
+    -- Kepala: 3 garis bikin C terbuka ke kiri
+    parts[#parts+1] = line(c, UDim2.new(0, t, 0, s*0.28),
+        UDim2.new(0.62, 0, 0.14, 0), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, s*0.22, 0, t),
+        UDim2.new(0.62, 0, 0.14, 0), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, s*0.22, 0, t),
+        UDim2.new(0.62, 0, 0.40, 0), col, 0, 1)
+
+    return parts
 end
 
--- ⚙️ CONFIG → gear (kotak + 4 gigi)
-IconFactory.config = function(parent, size, col, z)
+-- CONFIG: gear outline — ring stroke + inner dot + 4 gigi garis
+IconFactory.config = function(holder, size, col)
     local c = Instance.new("Frame")
     c.Size = UDim2.new(0, size, 0, size)
     c.BackgroundTransparency = 1
-    c.ZIndex = z or 20
-    c.Parent = parent
+    c.ZIndex = 24
+    c.Parent = holder
+    local parts = {}
 
     local s = size
-    -- ring tengah
+    local t = math.max(1.5, s * 0.09)
+
+    -- Ring pakai stroke frame
     local ring = Instance.new("Frame")
-    ring.Size = UDim2.new(0, s*0.55, 0, s*0.55)
-    ring.Position = UDim2.new(0.5, -s*0.275, 0.5, -s*0.275)
-    ring.BackgroundColor3 = col
-    ring.BorderSizePixel = 0
-    ring.ZIndex = z or 20
+    ring.Size = UDim2.new(0, s*0.56, 0, s*0.56)
+    ring.Position = UDim2.new(0.5, -s*0.28, 0.5, -s*0.28)
+    ring.BackgroundTransparency = 1
+    ring.ZIndex = 24
     ring.Parent = c
     corner(ring, s)
-    -- lubang tengah
-    local inner = Instance.new("Frame")
-    inner.Size = UDim2.new(0, s*0.22, 0, s*0.22)
-    inner.Position = UDim2.new(0.5, -s*0.11, 0.5, -s*0.11)
-    inner.BackgroundColor3 = THEME.PANEL_DARK
-    inner.BackgroundTransparency = 0.35
-    inner.BorderSizePixel = 0
-    inner.ZIndex = (z or 20) + 1
-    inner.Parent = c
-    corner(inner, s)
+    local rs = stroke(ring, col, t*1.1, 0)
+    parts[#parts+1] = ring
+    -- stroke color ikut berubah — track lewat parts? stroke bukan Frame
+    -- Simpelnya: simpan referensi stroke di field
+    ring._stroke = rs
+
+    -- Inner dot
+    parts[#parts+1] = line(c,
+        UDim2.new(0, s*0.14, 0, s*0.14),
+        UDim2.new(0.5, -s*0.07, 0.5, -s*0.07),
+        col, 0, s)
+
     -- 4 gigi
-    local teeth = {
-        {UDim2.new(0.5, -s*0.08, 0, 0),               UDim2.new(0, s*0.16, 0, s*0.28)}, -- top
-        {UDim2.new(0.5, -s*0.08, 1, -s*0.28),         UDim2.new(0, s*0.16, 0, s*0.28)}, -- bottom
-        {UDim2.new(0, 0, 0.5, -s*0.08),               UDim2.new(0, s*0.28, 0, s*0.16)}, -- left
-        {UDim2.new(1, -s*0.28, 0.5, -s*0.08),         UDim2.new(0, s*0.28, 0, s*0.16)}, -- right
-    }
-    for _, t in ipairs(teeth) do
-        bar(c, t[2], t[1], col, 2)
-    end
-    return c
+    parts[#parts+1] = line(c, UDim2.new(0, t, 0, s*0.16),
+        UDim2.new(0.5, -t/2, 0, s*0.08), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, t, 0, s*0.16),
+        UDim2.new(0.5, -t/2, 1, -s*0.24), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, s*0.16, 0, t),
+        UDim2.new(0, s*0.08, 0.5, -t/2), col, 0, 1)
+    parts[#parts+1] = line(c, UDim2.new(0, s*0.16, 0, t),
+        UDim2.new(1, -s*0.24, 0.5, -t/2), col, 0, 1)
+
+    return parts
 end
 
--- 👑 CROWN → 3 puncak + base
-IconFactory.crown = function(parent, size, col, z)
+-- CROWN: 3 puncak diamond + base line
+IconFactory.crown = function(holder, size, col)
     local c = Instance.new("Frame")
     c.Size = UDim2.new(0, size, 0, size)
     c.BackgroundTransparency = 1
-    c.ZIndex = z or 20
-    c.Parent = parent
+    c.ZIndex = 24
+    c.Parent = holder
+    local parts = {}
 
     local s = size
-    -- base
-    bar(c, UDim2.new(0, s*0.8, 0, s*0.16),
-        UDim2.new(0.5, -s*0.4, 1, -s*0.24), col, 2)
-    -- 3 puncak (triangle pakai Frame rotated 45)
+    local t = math.max(1.5, s * 0.09)
+
+    -- Base horizontal
+    parts[#parts+1] = line(c,
+        UDim2.new(0, s*0.72, 0, t),
+        UDim2.new(0.5, -s*0.36, 1, -s*0.22),
+        col, 0, 1)
+
+    -- 3 puncak (diamond rotated 45, ukuran beda)
     local peaks = {
-        {UDim2.new(0.5, -s*0.14, 0, s*0.2),  s*0.28}, -- tengah
-        {UDim2.new(0.1, 0, 0, s*0.4),         s*0.2},  -- kiri
-        {UDim2.new(0.9, -s*0.2, 0, s*0.4),    s*0.2},  -- kanan
+        {pos = UDim2.new(0.5, -s*0.12, 0, s*0.18), size = s*0.24},
+        {pos = UDim2.new(0.12, 0, 0, s*0.34), size = s*0.2},
+        {pos = UDim2.new(0.88, -s*0.2, 0, s*0.34), size = s*0.2},
     }
     for _, p in ipairs(peaks) do
-        local peak = Instance.new("Frame")
-        peak.Size = UDim2.new(0, p[2], 0, p[2])
-        peak.Position = p[1]
-        peak.BackgroundColor3 = col
-        peak.BorderSizePixel = 0
-        peak.Rotation = 45
-        peak.ZIndex = z or 20
-        peak.Parent = c
-        corner(peak, 2)
+        local pk = Instance.new("Frame")
+        pk.Size = UDim2.new(0, p.size, 0, p.size)
+        pk.Position = p.pos
+        pk.BackgroundColor3 = col
+        pk.BorderSizePixel = 0
+        pk.Rotation = 45
+        pk.ZIndex = 24
+        pk.Parent = c
+        corner(pk, 2)
+        parts[#parts+1] = pk
     end
-    return c
+
+    return parts
+end
+
+-- Helper: apply color ke semua parts icon
+local function recolorParts(parts, col)
+    for _, p in ipairs(parts) do
+        if p:IsA("Frame") then
+            if p._stroke then
+                p._stroke.Color = col
+            else
+                p.BackgroundColor3 = col
+            end
+        end
+    end
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
@@ -344,35 +430,45 @@ end
 local function toast(msg, color)
     if not State.screenGui then return end
     local s = State.scale
-    local W = math.floor(320 * s)
-    local H = math.floor(44 * s)
+    local W = math.floor(340 * s)
+    local H = math.floor(46 * s)
 
     local t = Instance.new("Frame")
     t.Size = UDim2.new(0, W, 0, H)
     t.Position = UDim2.new(0.5, -W/2, 1, 30)
-    t.BackgroundColor3 = THEME.PANEL
+    t.BackgroundColor3 = THEME.SURFACE
     t.BackgroundTransparency = THEME.PANEL_TRANS
     t.BorderSizePixel = 0
     t.ZIndex = 250
     t.Active = false
     t.Parent = State.screenGui
-    corner(t, 10)
-    stroke(t, color or THEME.ACCENT, 1.5, 0)
+    corner(t, THEME.RADIUS_MD)
+    stroke(t, color or THEME.ACCENT_LITE, 1, 0.4)
+
+    -- Dot indikator
+    local dot = Instance.new("Frame")
+    dot.Size = UDim2.new(0, math.floor(8 * s), 0, math.floor(8 * s))
+    dot.Position = UDim2.new(0, math.floor(14 * s), 0.5, -math.floor(4 * s))
+    dot.BackgroundColor3 = color or THEME.ACCENT_LITE
+    dot.BorderSizePixel = 0
+    dot.ZIndex = 252
+    dot.Parent = t
+    corner(dot, 4)
 
     label(t, {
         Text = msg,
-        Color = color or THEME.TEXT,
+        Color = THEME.TEXT,
         Font = Enum.Font.GothamMedium,
         Size = math.floor(11 * s),
-        FrameSize = UDim2.new(1, -20, 1, 0),
-        Pos = UDim2.new(0, 10, 0, 0),
-        XAlign = Enum.TextXAlignment.Center,
+        FrameSize = UDim2.new(1, -math.floor(36 * s), 1, 0),
+        Pos = UDim2.new(0, math.floor(30 * s), 0, 0),
+        XAlign = Enum.TextXAlignment.Left,
         Wrap = true,
         Z = 251,
     })
 
     TweenService:Create(t, TweenInfo.new(0.4, Enum.EasingStyle.Quint),
-        { Position = UDim2.new(0.5, -W/2, 1, -60) }):Play()
+        { Position = UDim2.new(0.5, -W/2, 1, -66) }):Play()
 
     task.delay(2.5, function()
         if t and t.Parent then
@@ -416,36 +512,48 @@ local function buildUI()
     gui.Parent = parentGui
     State.screenGui = gui
 
-    -- Shadow
+    -- Shadow (outer glow feel)
     local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(0, BW + 10, 0, BH + 10)
-    shadow.Position = UDim2.new(0.5, -(BW+10)/2, 0.5, -(BH+10)/2 + 5)
+    shadow.Size = UDim2.new(0, BW + 16, 0, BH + 16)
+    shadow.Position = UDim2.new(0.5, -(BW+16)/2, 0.5, -(BH+16)/2 + 6)
     shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     shadow.BackgroundTransparency = 0.55
     shadow.BorderSizePixel = 0
     shadow.ZIndex = 0
     shadow.Active = false
     shadow.Parent = gui
-    corner(shadow, 16)
+    corner(shadow, THEME.RADIUS_LG + 4)
     State.shadow = shadow
+
+    -- Soft accent glow (di belakang frame)
+    local glow = Instance.new("Frame")
+    glow.Size = UDim2.new(0, BW + 30, 0, BH + 30)
+    glow.Position = UDim2.new(0.5, -(BW+30)/2, 0.5, -(BH+30)/2 + 4)
+    glow.BackgroundColor3 = THEME.ACCENT
+    glow.BackgroundTransparency = 0.88
+    glow.BorderSizePixel = 0
+    glow.ZIndex = 0
+    glow.Active = false
+    glow.Parent = gui
+    corner(glow, THEME.RADIUS_LG + 8)
 
     -- Main
     local main = Instance.new("Frame")
     main.Name = "Main"
     main.Size = UDim2.new(0, BW, 0, BH)
     main.Position = UDim2.new(0.5, -BW/2, 0.5, -BH/2)
-    main.BackgroundColor3 = THEME.PANEL_DARK
+    main.BackgroundColor3 = THEME.SURFACE_2
     main.BackgroundTransparency = THEME.BG_TRANS
     main.BorderSizePixel = 0
     main.ClipsDescendants = true
     main.Active = true
     main.ZIndex = 3
     main.Parent = gui
-    corner(main, 14)
-    stroke(main, THEME.ACCENT, 1.2, 0.2)
+    corner(main, THEME.RADIUS_LG)
+    stroke(main, THEME.HAIRLINE, 1, 0.9)
     State.mainFrame = main
 
-    -- Background
+    -- Background image
     local bgImg = Instance.new("ImageLabel")
     bgImg.Size = UDim2.new(1, 0, 1, 0)
     bgImg.BackgroundTransparency = 1
@@ -455,22 +563,22 @@ local function buildUI()
     bgImg.Active = false
     bgImg.ZIndex = 1
     bgImg.Parent = main
-    corner(bgImg, 14)
+    corner(bgImg, THEME.RADIUS_LG)
 
-    -- Overlay
+    -- Overlay gradient (dark top-bottom)
     local ov = Instance.new("Frame")
     ov.Size = UDim2.new(1, 0, 1, 0)
-    ov.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
-    ov.BackgroundTransparency = 0.35
+    ov.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
+    ov.BackgroundTransparency = 0.3
     ov.BorderSizePixel = 0
     ov.Active = false
     ov.ZIndex = 2
     ov.Parent = main
-    corner(ov, 14)
+    corner(ov, THEME.RADIUS_LG)
     local ovGrad = Instance.new("UIGradient")
     ovGrad.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.2),
-        NumberSequenceKeypoint.new(0.5, 0.55),
+        NumberSequenceKeypoint.new(0, 0.15),
+        NumberSequenceKeypoint.new(0.5, 0.5),
         NumberSequenceKeypoint.new(1, 0.75),
     })
     ovGrad.Rotation = 90
@@ -479,24 +587,44 @@ local function buildUI()
     -- ═══════════════ HEADER ═══════════════
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, 0, 0, HH)
-    header.BackgroundColor3 = THEME.PANEL_DARK
-    header.BackgroundTransparency = THEME.BG_TRANS
+    header.BackgroundColor3 = THEME.SURFACE
+    header.BackgroundTransparency = 0.3
     header.BorderSizePixel = 0
     header.Active = true
     header.ZIndex = 6
     header.Parent = main
-    corner(header, 14)
+    corner(header, THEME.RADIUS_LG)
 
-    -- Logo diamond (bukan emoji)
+    -- Bottom hairline
+    local headerLine = Instance.new("Frame")
+    headerLine.Size = UDim2.new(1, -20, 0, 1)
+    headerLine.Position = UDim2.new(0, 10, 1, -1)
+    headerLine.BackgroundColor3 = THEME.HAIRLINE
+    headerLine.BackgroundTransparency = 0.85
+    headerLine.BorderSizePixel = 0
+    headerLine.ZIndex = 20
+    headerLine.Parent = header
+
+     -- Logo: hexagon-ish (diamond + ring accent)
     local logoWrap = Instance.new("Frame")
-    logoWrap.Size = UDim2.new(0, math.floor(24 * s), 0, math.floor(24 * s))
-    logoWrap.Position = UDim2.new(0, math.floor(14 * s), 0.5, -math.floor(12 * s))
+    logoWrap.Size = UDim2.new(0, math.floor(26 * s), 0, math.floor(26 * s))
+    logoWrap.Position = UDim2.new(0, math.floor(16 * s), 0.5, -math.floor(13 * s))
     logoWrap.BackgroundTransparency = 1
     logoWrap.ZIndex = 7
     logoWrap.Parent = header
+
+    local logoRing = Instance.new("Frame")
+    logoRing.Size = UDim2.new(0, math.floor(22 * s), 0, math.floor(22 * s))
+    logoRing.Position = UDim2.new(0.5, -math.floor(11 * s), 0.5, -math.floor(11 * s))
+    logoRing.BackgroundTransparency = 1
+    logoRing.ZIndex = 7
+    logoRing.Parent = logoWrap
+    corner(logoRing, math.floor(11 * s))
+    stroke(logoRing, THEME.ACCENT, 1.5, 0.1)
+
     local logoD = Instance.new("Frame")
-    logoD.Size = UDim2.new(0, math.floor(14 * s), 0, math.floor(14 * s))
-    logoD.Position = UDim2.new(0.5, -math.floor(7 * s), 0.5, -math.floor(7 * s))
+    logoD.Size = UDim2.new(0, math.floor(11 * s), 0, math.floor(11 * s))
+    logoD.Position = UDim2.new(0.5, -math.floor(5.5 * s), 0.5, -math.floor(5.5 * s))
     logoD.BackgroundColor3 = THEME.ACCENT
     logoD.BorderSizePixel = 0
     logoD.Rotation = 45
@@ -504,66 +632,83 @@ local function buildUI()
     logoD.Parent = logoWrap
     corner(logoD, 2)
 
+    -- Brand text
     label(header, {
         Text = "KEI SELVIM",
         Color = THEME.TEXT,
-        Font = Enum.Font.GothamBlack,
+        Font = Enum.Font.GothamBold,
         Size = math.floor(12 * s),
-        FrameSize = UDim2.new(0, math.floor(100 * s), 1, 0),
-        Pos = UDim2.new(0, math.floor(46 * s), 0, 0),
+        FrameSize = UDim2.new(0, math.floor(110 * s), 0, math.floor(16 * s)),
+        Pos = UDim2.new(0, math.floor(52 * s), 0, math.floor(HH/2 - 10 * s)),
         Z = 7,
     })
 
+    label(header, {
+        Text = "SHELL",
+        Color = THEME.TEXT_FAINT,
+        Font = Enum.Font.GothamMedium,
+        Size = math.floor(8 * s),
+        FrameSize = UDim2.new(0, math.floor(110 * s), 0, math.floor(12 * s)),
+        Pos = UDim2.new(0, math.floor(53 * s), 0, math.floor(HH/2 + 6 * s)),
+        Z = 7,
+    })
+
+    -- Version pill
     local badge = Instance.new("Frame")
-    badge.Size = UDim2.new(0, math.floor(38 * s), 0, math.floor(16 * s))
-    badge.Position = UDim2.new(0, math.floor(150 * s), 0, math.floor((HH - 16 * s)/2))
+    badge.Size = UDim2.new(0, math.floor(40 * s), 0, math.floor(18 * s))
+    badge.Position = UDim2.new(0, math.floor(158 * s), 0, math.floor((HH - 18 * s)/2))
     badge.BackgroundColor3 = THEME.ACCENT
-    badge.BackgroundTransparency = 0.4
+    badge.BackgroundTransparency = 0.55
     badge.BorderSizePixel = 0
     badge.Active = false
     badge.ZIndex = 7
     badge.Parent = header
-    corner(badge, 4)
+    corner(badge, 9)
+    stroke(badge, THEME.ACCENT_LITE, 1, 0.6)
     label(badge, {
-        Text = "v1.1",
-        Color = Color3.fromRGB(255, 220, 255),
+        Text = "v2.1",
+        Color = THEME.ACCENT_LITE,
         Font = Enum.Font.GothamBold,
         Size = math.floor(9 * s),
         XAlign = Enum.TextXAlignment.Center,
         Z = 8,
     })
 
-    -- Close button — glyph ✕ (bukan emoji, ini symbol matematika)
-    local btnS = math.floor(26 * s)
-    local closeBtn = button(header, {
+    -- Close button (merah, outline saja)
+    local btnS = math.floor(28 * s)
+    local closeBtn = makeButton(header, {
         Name = "Close",
         Text = "✕",
-        Color = THEME.DANGER,
-        StrokeColor = THEME.DANGER,
+        IdleColor = Color3.fromRGB(60, 24, 34),
+        ActiveColor = THEME.DANGER,
+        HoverColor = Color3.fromRGB(90, 32, 46),
+        TextColor = Color3.fromRGB(255, 180, 190),
         Font = Enum.Font.GothamBold,
         TextSize = math.floor(12 * s),
         FrameSize = UDim2.new(0, btnS, 0, btnS),
-        Pos = UDim2.new(1, -math.floor(34 * s), 0, math.floor((HH - btnS)/2)),
-        Radius = 6,
+        Pos = UDim2.new(1, -math.floor(38 * s), 0, math.floor((HH - btnS)/2)),
+        Radius = THEME.RADIUS_SM,
+        StrokeColor = THEME.DANGER,
         Z = 10,
     })
 
-    -- Minimize button — pakai bar (bukan emoji)
-    local minBtn = button(header, {
+    -- Minimize button (garis di tengah)
+    local minBtn = makeButton(header, {
         Name = "Minimize",
-        Color = THEME.PANEL,
-        StrokeColor = THEME.ACCENT_DIM,
+        IdleColor = THEME.BTN_IDLE,
+        HoverColor = THEME.BTN_HOVER,
         FrameSize = UDim2.new(0, btnS, 0, btnS),
-        Pos = UDim2.new(1, -math.floor(64 * s), 0, math.floor((HH - btnS)/2)),
-        Radius = 6,
+        Pos = UDim2.new(1, -math.floor(72 * s), 0, math.floor((HH - btnS)/2)),
+        Radius = THEME.RADIUS_SM,
+        StrokeColor = THEME.HAIRLINE,
         Z = 10,
     })
     local minBar = Instance.new("Frame")
     minBar.Size = UDim2.new(0, math.floor(12 * s), 0, math.floor(2 * s))
     minBar.Position = UDim2.new(0.5, -math.floor(6 * s), 0.5, -math.floor(1 * s))
-    minBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    minBar.BackgroundColor3 = THEME.TEXT_DIM
     minBar.BorderSizePixel = 0
-    minBar.ZIndex = 12
+    minBar.ZIndex = 14
     minBar.Parent = minBtn
     corner(minBar, 1)
 
@@ -571,12 +716,22 @@ local function buildUI()
     local sidebar = Instance.new("Frame")
     sidebar.Size = UDim2.new(0, SBW, 1, -HH)
     sidebar.Position = UDim2.new(0, 0, 0, HH)
-    sidebar.BackgroundColor3 = THEME.PANEL_DARK
-    sidebar.BackgroundTransparency = 0.35
+    sidebar.BackgroundColor3 = THEME.SURFACE_2
+    sidebar.BackgroundTransparency = 0.5
     sidebar.BorderSizePixel = 0
     sidebar.Active = false
     sidebar.ZIndex = 5
     sidebar.Parent = main
+
+    -- Sidebar right hairline
+    local sbLine = Instance.new("Frame")
+    sbLine.Size = UDim2.new(0, 1, 1, -20)
+    sbLine.Position = UDim2.new(1, -1, 0, 10)
+    sbLine.BackgroundColor3 = THEME.HAIRLINE
+    sbLine.BackgroundTransparency = 0.88
+    sbLine.BorderSizePixel = 0
+    sbLine.ZIndex = 20
+    sbLine.Parent = sidebar
 
     -- ═══════════════ CONTENT ═══════════════
     local content = Instance.new("Frame")
@@ -602,7 +757,7 @@ local function buildUI()
             Text = title,
             Color = THEME.TEXT,
             Font = Enum.Font.GothamBold,
-            Size = math.floor(15 * s),
+            Size = math.floor(16 * s),
             FrameSize = UDim2.new(1, 0, 0, math.floor(24 * s)),
             Pos = UDim2.new(0, 0, 0, 0),
             Z = 8,
@@ -614,14 +769,14 @@ local function buildUI()
                 Font = Enum.Font.Gotham,
                 Size = math.floor(10 * s),
                 FrameSize = UDim2.new(1, 0, 0, math.floor(16 * s)),
-                Pos = UDim2.new(0, 0, 0, math.floor(26 * s)),
+                Pos = UDim2.new(0, 0, 0, math.floor(28 * s)),
                 Z = 8,
             })
         end
 
         local body = Instance.new("Frame")
-        body.Size = UDim2.new(1, 0, 1, -math.floor(50 * s))
-        body.Position = UDim2.new(0, 0, 0, math.floor(50 * s))
+        body.Size = UDim2.new(1, 0, 1, -math.floor(56 * s))
+        body.Position = UDim2.new(0, 0, 0, math.floor(56 * s))
         body.BackgroundTransparency = 1
         body.Active = false
         body.ZIndex = 6
@@ -635,26 +790,27 @@ local function buildUI()
     local homeBody = makePage("home", "Home", "Dashboard & info")
 
     local profileCard = Instance.new("Frame")
-    profileCard.Size = UDim2.new(1, 0, 0, math.floor(64 * s))
-    profileCard.BackgroundColor3 = THEME.PANEL
+    profileCard.Size = UDim2.new(1, 0, 0, math.floor(70 * s))
+    profileCard.BackgroundColor3 = THEME.SURFACE
     profileCard.BackgroundTransparency = THEME.PANEL_TRANS
     profileCard.BorderSizePixel = 0
     profileCard.Active = false
     profileCard.ZIndex = 7
     profileCard.Parent = homeBody
-    corner(profileCard, 10)
-    stroke(profileCard, THEME.ACCENT_DIM, 1, 0.2)
+    corner(profileCard, THEME.RADIUS_MD)
+    stroke(profileCard, THEME.HAIRLINE, 1, 0.88)
 
     local av = Instance.new("ImageLabel")
-    av.Size = UDim2.new(0, math.floor(46 * s), 0, math.floor(46 * s))
-    av.Position = UDim2.new(0, math.floor(10 * s), 0.5, -math.floor(23 * s))
-    av.BackgroundColor3 = THEME.ACCENT_DIM
+    av.Size = UDim2.new(0, math.floor(50 * s), 0, math.floor(50 * s))
+    av.Position = UDim2.new(0, math.floor(12 * s), 0.5, -math.floor(25 * s))
+    av.BackgroundColor3 = THEME.SURFACE_3
     av.BackgroundTransparency = 0.3
     av.BorderSizePixel = 0
     av.Active = false
     av.ZIndex = 8
     av.Parent = profileCard
-    corner(av, math.floor(23 * s))
+    corner(av, math.floor(25 * s))
+    stroke(av, THEME.ACCENT_LITE, 1.5, 0.5)
 
     task.spawn(function()
         if LocalPlayer then
@@ -671,8 +827,8 @@ local function buildUI()
         Color = THEME.TEXT,
         Font = Enum.Font.GothamBold,
         Size = math.floor(13 * s),
-        FrameSize = UDim2.new(1, -math.floor(70 * s), 0, math.floor(18 * s)),
-        Pos = UDim2.new(0, math.floor(66 * s), 0, math.floor(10 * s)),
+        FrameSize = UDim2.new(1, -math.floor(80 * s), 0, math.floor(18 * s)),
+        Pos = UDim2.new(0, math.floor(74 * s), 0, math.floor(12 * s)),
         Z = 8,
     })
     label(profileCard, {
@@ -680,106 +836,116 @@ local function buildUI()
         Color = THEME.TEXT_DIM,
         Font = Enum.Font.Gotham,
         Size = math.floor(10 * s),
-        FrameSize = UDim2.new(1, -math.floor(70 * s), 0, math.floor(14 * s)),
-        Pos = UDim2.new(0, math.floor(66 * s), 0, math.floor(28 * s)),
+        FrameSize = UDim2.new(1, -math.floor(80 * s), 0, math.floor(14 * s)),
+        Pos = UDim2.new(0, math.floor(74 * s), 0, math.floor(30 * s)),
         Z = 8,
     })
     label(profileCard, {
-        Text = "Kei Selvim  •  UI Shell",
-        Color = THEME.ACCENT_GLOW,
+        Text = "◈  Kei Selvim  ·  Shell v2.1",
+        Color = THEME.ACCENT_LITE,
         Font = Enum.Font.GothamMedium,
         Size = math.floor(9 * s),
-        FrameSize = UDim2.new(1, -math.floor(70 * s), 0, math.floor(14 * s)),
-        Pos = UDim2.new(0, math.floor(66 * s), 0, math.floor(44 * s)),
+        FrameSize = UDim2.new(1, -math.floor(80 * s), 0, math.floor(14 * s)),
+        Pos = UDim2.new(0, math.floor(74 * s), 0, math.floor(46 * s)),
         Z = 8,
     })
 
     -- Stat grid
     local statsGrid = Instance.new("Frame")
-    statsGrid.Size = UDim2.new(1, 0, 0, math.floor(130 * s))
-    statsGrid.Position = UDim2.new(0, 0, 0, math.floor(72 * s))
+    statsGrid.Size = UDim2.new(1, 0, 0, math.floor(140 * s))
+    statsGrid.Position = UDim2.new(0, 0, 0, math.floor(82 * s))
     statsGrid.BackgroundTransparency = 1
     statsGrid.Active = false
     statsGrid.ZIndex = 7
     statsGrid.Parent = homeBody
 
     local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.new(0.5, -math.floor(6 * s), 0, math.floor(60 * s))
+    grid.CellSize = UDim2.new(0.5, -math.floor(6 * s), 0, math.floor(64 * s))
     grid.CellPadding = UDim2.new(0, math.floor(12 * s), 0, math.floor(10 * s))
     grid.SortOrder = Enum.SortOrder.LayoutOrder
     grid.Parent = statsGrid
 
-    -- Icon kecil untuk stat card — pakai geometric symbol, bukan emoji
-    local function makeStatCard(order, title, value, color, iconSymbol)
+    local function makeStatCard(order, title, value, color, symbol)
         local card = Instance.new("Frame")
-        card.BackgroundColor3 = THEME.PANEL
+        card.BackgroundColor3 = THEME.SURFACE
         card.BackgroundTransparency = THEME.PANEL_TRANS
         card.BorderSizePixel = 0
         card.LayoutOrder = order
         card.Active = false
         card.ZIndex = 8
         card.Parent = statsGrid
-        corner(card, 10)
-        stroke(card, THEME.ACCENT_DIM, 1, 0.2)
+        corner(card, THEME.RADIUS_MD)
+        stroke(card, THEME.HAIRLINE, 1, 0.88)
 
-        -- Icon pakai symbol geometris (◆ ● ▲ ■ dll)
-        label(card, {
-            Text = iconSymbol,
-            Color = color,
-            Font = Enum.Font.GothamBold,
-            Size = math.floor(14 * s),
-            FrameSize = UDim2.new(0, math.floor(22 * s), 0, math.floor(20 * s)),
-            Pos = UDim2.new(0, math.floor(10 * s), 0, math.floor(8 * s)),
-            XAlign = Enum.TextXAlignment.Center,
-            Z = 9,
-        })
+        -- Accent bar kiri
+        local bar = Instance.new("Frame")
+        bar.Size = UDim2.new(0, math.floor(3 * s), 1, -math.floor(20 * s))
+        bar.Position = UDim2.new(0, 0, 0, math.floor(10 * s))
+        bar.BackgroundColor3 = color
+        bar.BorderSizePixel = 0
+        bar.ZIndex = 9
+        bar.Parent = card
+        corner(bar, 2)
+
         label(card, {
             Text = title,
             Color = THEME.TEXT_DIM,
-            Font = Enum.Font.Gotham,
+            Font = Enum.Font.GothamMedium,
             Size = math.floor(9 * s),
-            FrameSize = UDim2.new(1, -math.floor(40 * s), 0, math.floor(14 * s)),
-            Pos = UDim2.new(0, math.floor(36 * s), 0, math.floor(10 * s)),
+            FrameSize = UDim2.new(1, -math.floor(50 * s), 0, math.floor(14 * s)),
+            Pos = UDim2.new(0, math.floor(14 * s), 0, math.floor(10 * s)),
             Z = 9,
         })
+
         label(card, {
             Text = value,
             Color = color,
             Font = Enum.Font.GothamBold,
-            Size = math.floor(15 * s),
-            FrameSize = UDim2.new(1, -math.floor(20 * s), 0, math.floor(22 * s)),
-            Pos = UDim2.new(0, math.floor(10 * s), 0, math.floor(30 * s)),
+            Size = math.floor(18 * s),
+            FrameSize = UDim2.new(1, -math.floor(50 * s), 0, math.floor(26 * s)),
+            Pos = UDim2.new(0, math.floor(14 * s), 0, math.floor(28 * s)),
+            Z = 9,
+        })
+
+        -- Symbol kanan atas
+        label(card, {
+            Text = symbol,
+            Color = color,
+            Font = Enum.Font.GothamBold,
+            Size = math.floor(16 * s),
+            FrameSize = UDim2.new(0, math.floor(30 * s), 0, math.floor(30 * s)),
+            Pos = UDim2.new(1, -math.floor(38 * s), 0, math.floor(12 * s)),
+            XAlign = Enum.TextXAlignment.Center,
             Z = 9,
         })
     end
 
-    makeStatCard(1, "FPS",     "60",     Color3.fromRGB(100, 255, 150), "▲")
-    makeStatCard(2, "PING",    "0 ms",   Color3.fromRGB(255, 200, 100), "●")
-    makeStatCard(3, "STATUS",  "Ready",  Color3.fromRGB(150, 200, 255), "◆")
-    makeStatCard(4, "MODE",    "UI Only",Color3.fromRGB(255, 150, 200), "■")
+    makeStatCard(1, "FPS",     "60",      Color3.fromRGB(100, 255, 150), "▲")
+    makeStatCard(2, "PING",    "0 ms",    Color3.fromRGB(255, 200, 100), "●")
+    makeStatCard(3, "STATUS",  "Ready",   Color3.fromRGB(150, 200, 255), "◆")
+    makeStatCard(4, "MODE",    "UI Only", Color3.fromRGB(255, 150, 200), "■")
 
     -- ─── TOOLS ───
     local toolsBody = makePage("tools", "Tools", "Function panel")
 
     local toolsCard = Instance.new("Frame")
-    toolsCard.Size = UDim2.new(1, 0, 0, math.floor(150 * s))
-    toolsCard.BackgroundColor3 = THEME.PANEL
+    toolsCard.Size = UDim2.new(1, 0, 0, math.floor(170 * s))
+    toolsCard.BackgroundColor3 = THEME.SURFACE
     toolsCard.BackgroundTransparency = THEME.PANEL_TRANS
     toolsCard.BorderSizePixel = 0
     toolsCard.Active = false
     toolsCard.ZIndex = 7
     toolsCard.Parent = toolsBody
-    corner(toolsCard, 10)
-    stroke(toolsCard, THEME.ACCENT_DIM, 1, 0.2)
+    corner(toolsCard, THEME.RADIUS_MD)
+    stroke(toolsCard, THEME.HAIRLINE, 1, 0.88)
 
-    -- Icon tools di tengah card
-    local iconWrap = Instance.new("Frame")
-    iconWrap.Size = UDim2.new(0, math.floor(36 * s), 0, math.floor(36 * s))
-    iconWrap.Position = UDim2.new(0.5, -math.floor(18 * s), 0, math.floor(14 * s))
-    iconWrap.BackgroundTransparency = 1
-    iconWrap.ZIndex = 8
-    iconWrap.Parent = toolsCard
-    IconFactory.tools(iconWrap, math.floor(36 * s), THEME.ACCENT_GLOW, 20)
+    local toolsIconWrap = Instance.new("Frame")
+    toolsIconWrap.Size = UDim2.new(0, math.floor(40 * s), 0, math.floor(40 * s))
+    toolsIconWrap.Position = UDim2.new(0.5, -math.floor(20 * s), 0, math.floor(18 * s))
+    toolsIconWrap.BackgroundTransparency = 1
+    toolsIconWrap.ZIndex = 8
+    toolsIconWrap.Parent = toolsCard
+    IconFactory.tools(toolsIconWrap, math.floor(40 * s), THEME.ACCENT_LITE)
 
     label(toolsCard, {
         Text = "Tools panel — logic di sini nanti",
@@ -787,43 +953,47 @@ local function buildUI()
         Font = Enum.Font.Gotham,
         Size = math.floor(11 * s),
         FrameSize = UDim2.new(1, 0, 0, math.floor(20 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(58 * s)),
+        Pos = UDim2.new(0, 0, 0, math.floor(68 * s)),
         XAlign = Enum.TextXAlignment.Center,
         Z = 8,
     })
 
-    local sampleBtn = button(toolsCard, {
+    local sampleBtn = makeButton(toolsCard, {
         Text = "Sample Button",
-        FrameSize = UDim2.new(1, -math.floor(40 * s), 0, math.floor(32 * s)),
-        Pos = UDim2.new(0, math.floor(20 * s), 0, math.floor(96 * s)),
+        FrameSize = UDim2.new(1, -math.floor(40 * s), 0, math.floor(36 * s)),
+        Pos = UDim2.new(0, math.floor(20 * s), 0, math.floor(108 * s)),
         TextSize = math.floor(11 * s),
         Z = 9,
     })
+    local sampleActive = false
     sampleBtn.MouseButton1Click:Connect(function()
-        toast("Sample button clicked — placeholder", THEME.ACCENT_GLOW)
+        sampleActive = not sampleActive
+        sampleBtn.SetActive(sampleActive)
+        toast(sampleActive and "Sample: ON" or "Sample: OFF",
+            sampleActive and THEME.ACCENT_LITE or THEME.TEXT_DIM)
     end)
 
     -- ─── CONFIG ───
     local configBody = makePage("config", "Config", "Settings panel")
 
     local configCard = Instance.new("Frame")
-    configCard.Size = UDim2.new(1, 0, 0, math.floor(120 * s))
-    configCard.BackgroundColor3 = THEME.PANEL
+    configCard.Size = UDim2.new(1, 0, 0, math.floor(130 * s))
+    configCard.BackgroundColor3 = THEME.SURFACE
     configCard.BackgroundTransparency = THEME.PANEL_TRANS
     configCard.BorderSizePixel = 0
     configCard.Active = false
     configCard.ZIndex = 7
     configCard.Parent = configBody
-    corner(configCard, 10)
-    stroke(configCard, THEME.ACCENT_DIM, 1, 0.2)
+    corner(configCard, THEME.RADIUS_MD)
+    stroke(configCard, THEME.HAIRLINE, 1, 0.88)
 
     local cfgIconWrap = Instance.new("Frame")
-    cfgIconWrap.Size = UDim2.new(0, math.floor(36 * s), 0, math.floor(36 * s))
-    cfgIconWrap.Position = UDim2.new(0.5, -math.floor(18 * s), 0, math.floor(16 * s))
+    cfgIconWrap.Size = UDim2.new(0, math.floor(40 * s), 0, math.floor(40 * s))
+    cfgIconWrap.Position = UDim2.new(0.5, -math.floor(20 * s), 0, math.floor(18 * s))
     cfgIconWrap.BackgroundTransparency = 1
     cfgIconWrap.ZIndex = 8
     cfgIconWrap.Parent = configCard
-    IconFactory.config(cfgIconWrap, math.floor(36 * s), THEME.ACCENT_GLOW, 20)
+    IconFactory.config(cfgIconWrap, math.floor(40 * s), THEME.ACCENT_LITE)
 
     label(configCard, {
         Text = "Config panel — logic di sini nanti",
@@ -831,7 +1001,7 @@ local function buildUI()
         Font = Enum.Font.Gotham,
         Size = math.floor(11 * s),
         FrameSize = UDim2.new(1, 0, 0, math.floor(20 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(64 * s)),
+        Pos = UDim2.new(0, 0, 0, math.floor(70 * s)),
         XAlign = Enum.TextXAlignment.Center,
         Z = 8,
     })
@@ -840,23 +1010,23 @@ local function buildUI()
     local crownBody = makePage("crown", "Crown", "Admin panel")
 
     local crownCard = Instance.new("Frame")
-    crownCard.Size = UDim2.new(1, 0, 0, math.floor(120 * s))
-    crownCard.BackgroundColor3 = THEME.PANEL
+    crownCard.Size = UDim2.new(1, 0, 0, math.floor(130 * s))
+    crownCard.BackgroundColor3 = THEME.SURFACE
     crownCard.BackgroundTransparency = THEME.PANEL_TRANS
     crownCard.BorderSizePixel = 0
     crownCard.Active = false
     crownCard.ZIndex = 7
     crownCard.Parent = crownBody
-    corner(crownCard, 10)
-    stroke(crownCard, Color3.fromRGB(255, 200, 60), 1, 0.2)
+    corner(crownCard, THEME.RADIUS_MD)
+    stroke(crownCard, Color3.fromRGB(255, 200, 60), 1, 0.6)
 
     local crownIconWrap = Instance.new("Frame")
-    crownIconWrap.Size = UDim2.new(0, math.floor(36 * s), 0, math.floor(36 * s))
-    crownIconWrap.Position = UDim2.new(0.5, -math.floor(18 * s), 0, math.floor(16 * s))
+    crownIconWrap.Size = UDim2.new(0, math.floor(40 * s), 0, math.floor(40 * s))
+    crownIconWrap.Position = UDim2.new(0.5, -math.floor(20 * s), 0, math.floor(18 * s))
     crownIconWrap.BackgroundTransparency = 1
     crownIconWrap.ZIndex = 8
     crownIconWrap.Parent = crownCard
-    IconFactory.crown(crownIconWrap, math.floor(36 * s), Color3.fromRGB(255, 200, 60), 20)
+    IconFactory.crown(crownIconWrap, math.floor(40 * s), Color3.fromRGB(255, 200, 60))
 
     label(crownCard, {
         Text = "Admin panel — logic di sini nanti",
@@ -864,66 +1034,67 @@ local function buildUI()
         Font = Enum.Font.Gotham,
         Size = math.floor(11 * s),
         FrameSize = UDim2.new(1, 0, 0, math.floor(20 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(64 * s)),
+        Pos = UDim2.new(0, 0, 0, math.floor(70 * s)),
         XAlign = Enum.TextXAlignment.Center,
         Z = 8,
     })
 
     -- ═══════════════ SIDEBAR ICONS ═══════════════
-    -- Tiap icon digambar dari primitive shape, bukan emoji
     local iconList = {
         { id = "home",   factory = IconFactory.home },
         { id = "tools",  factory = IconFactory.tools },
         { id = "config", factory = IconFactory.config },
-        { id = "crown",  factory = IconFactory.crown },
+        { id = "crown",  factory = IconFactory.crown, color = Color3.fromRGB(255, 200, 60) },
     }
 
-    local iconY = math.floor(10 * s)
+    local iconY = math.floor(14 * s)
     for i, item in ipairs(iconList) do
-        -- Container button
-        local btn = Instance.new("TextButton")
-        btn.Name = item.id .. "Icon"
-        btn.BackgroundColor3 = THEME.ACCENT_DIM
-        btn.BackgroundTransparency = THEME.BTN_TRANS
-        btn.Text = ""
-        btn.Size = UDim2.new(0, ICS, 0, ICS)
-        btn.Position = UDim2.new(0, math.floor((SBW - ICS)/2), 0, iconY + (i-1) * (ICS + ICG))
-        btn.BorderSizePixel = 0
-        btn.AutoButtonColor = false
-        btn.Active = true
-        btn.Selectable = true
-        btn.ZIndex = 10
-        btn.Parent = sidebar
-        corner(btn, 10)
-        stroke(btn, THEME.ACCENT_DIM, 1, 0.3)
+        -- Button pakai makeButton (state: idle abu, active ungu)
+        local btn = makeButton(sidebar, {
+            Name = item.id .. "Btn",
+            IdleColor = THEME.BTN_IDLE,
+            HoverColor = THEME.BTN_HOVER,
+            ActiveColor = THEME.ACCENT,
+            FrameSize = UDim2.new(0, ICS, 0, ICS),
+            Pos = UDim2.new(0, math.floor((SBW - ICS)/2), 0, iconY + (i-1) * (ICS + ICG)),
+            Radius = THEME.RADIUS_MD,
+            StrokeColor = THEME.HAIRLINE,
+            Z = 10,
+        })
 
-        -- Icon di dalam button
-        local iconHolder = Instance.new("Frame")
-        iconHolder.Size = UDim2.new(0, math.floor(22 * s), 0, math.floor(22 * s))
-        iconHolder.Position = UDim2.new(0.5, -math.floor(11 * s), 0.5, -math.floor(11 * s))
-        iconHolder.BackgroundTransparency = 1
-        iconHolder.ZIndex = 12
-        iconHolder.Parent = btn
+        -- Icon holder di dalam button
+        local holder = Instance.new("Frame")
+        holder.Size = UDim2.new(0, math.floor(24 * s), 0, math.floor(24 * s))
+        holder.Position = UDim2.new(0.5, -math.floor(12 * s), 0.5, -math.floor(12 * s))
+        holder.BackgroundTransparency = 1
+        holder.ZIndex = 15
+        holder.Parent = btn
 
-        local iconFrame = item.factory(iconHolder, math.floor(22 * s), Color3.fromRGB(230, 220, 255), 12)
-        State.sidebarButtons[item.id] = { button = btn, icon = iconFrame }
+        local iconColor = item.color or THEME.TEXT_DIM
+        local parts = item.factory(holder, math.floor(24 * s), iconColor)
 
-        -- Hover
-        local baseColor = THEME.ACCENT_DIM
-        local baseTrans = THEME.BTN_TRANS
+        State.sidebarButtons[item.id] = {
+            button = btn,
+            parts = parts,
+            idleIconColor = iconColor,
+            activeIconColor = Color3.fromRGB(255, 255, 255),
+        }
+
+        -- Update icon color saat state berubah
         btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.15), {
-                BackgroundColor3 = THEME.ACCENT_GLOW,
-                BackgroundTransparency = math.max(0, baseTrans - 0.1),
-            }):Play()
+            if not btn.GetActive() then
+                recolorParts(parts, THEME.TEXT)
+            end
         end)
         btn.MouseLeave:Connect(function()
-            -- Kalo ini current page, tetap terang
-            local target = (State.currentPage == item.id) and THEME.ACCENT or baseColor
-            TweenService:Create(btn, TweenInfo.new(0.15), {
-                BackgroundColor3 = target,
-                BackgroundTransparency = baseTrans,
-            }):Play()
+            if btn.GetActive() then
+                recolorParts(parts, Color3.fromRGB(255, 255, 255))
+            else
+                recolorParts(parts, iconColor)
+            end
+        end)
+        btn.MouseButton1Click:Connect(function()
+            -- handled below in switchPage
         end)
     end
 
@@ -934,9 +1105,11 @@ local function buildUI()
         end
         for bid, data in pairs(State.sidebarButtons) do
             if bid == id then
-                data.button.BackgroundColor3 = THEME.ACCENT
+                data.button.SetActive(true)
+                recolorParts(data.parts, data.activeIconColor)
             else
-                data.button.BackgroundColor3 = THEME.ACCENT_DIM
+                data.button.SetActive(false)
+                recolorParts(data.parts, data.idleIconColor)
             end
         end
         State.currentPage = id
@@ -967,8 +1140,12 @@ local function buildUI()
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y
             )
             shadow.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X - 5,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y - 5
+                startPos.X.Scale, startPos.X.Offset + delta.X - 8,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y - 2
+            )
+            glow.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X - 15,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y - 11
             )
         end
     end)
@@ -981,19 +1158,19 @@ local function buildUI()
 
     -- ═══════════════ CLOSE ═══════════════
     closeBtn.MouseButton1Click:Connect(function()
-        local cW = math.floor(300 * s)
-        local cH = math.floor(140 * s)
+        local cW = math.floor(310 * s)
+        local cH = math.floor(150 * s)
         local confirm = Instance.new("Frame")
         confirm.Size = UDim2.new(0, cW, 0, cH)
         confirm.Position = UDim2.new(0.5, -cW/2, 0.5, -cH/2)
-        confirm.BackgroundColor3 = THEME.PANEL
-        confirm.BackgroundTransparency = THEME.PANEL_TRANS
+        confirm.BackgroundColor3 = THEME.SURFACE
+        confirm.BackgroundTransparency = 0.15
         confirm.BorderSizePixel = 0
         confirm.Active = true
         confirm.ZIndex = 300
         confirm.Parent = gui
-        corner(confirm, 12)
-        stroke(confirm, THEME.DANGER, 1.5, 0)
+        corner(confirm, THEME.RADIUS_LG)
+        stroke(confirm, THEME.DANGER, 1.5, 0.3)
 
         label(confirm, {
             Text = "Konfirmasi",
@@ -1001,7 +1178,7 @@ local function buildUI()
             Font = Enum.Font.GothamBold,
             Size = math.floor(14 * s),
             FrameSize = UDim2.new(1, 0, 0, math.floor(26 * s)),
-            Pos = UDim2.new(0, 0, 0, math.floor(14 * s)),
+            Pos = UDim2.new(0, 0, 0, math.floor(16 * s)),
             XAlign = Enum.TextXAlignment.Center,
             Z = 301,
         })
@@ -1011,33 +1188,37 @@ local function buildUI()
             Font = Enum.Font.Gotham,
             Size = math.floor(11 * s),
             FrameSize = UDim2.new(1, -20, 0, math.floor(36 * s)),
-            Pos = UDim2.new(0, 10, 0, math.floor(46 * s)),
+            Pos = UDim2.new(0, 10, 0, math.floor(48 * s)),
             XAlign = Enum.TextXAlignment.Center,
             Wrap = true,
             Z = 301,
         })
 
         local bW = (cW - math.floor(30 * s)) / 2
-        local yes = button(confirm, {
+        local yes = makeButton(confirm, {
             Text = "Ya, Tutup",
-            Color = THEME.DANGER,
-            StrokeColor = THEME.DANGER,
+            IdleColor = THEME.DANGER,
+            ActiveColor = THEME.DANGER,
+            HoverColor = Color3.fromRGB(255, 100, 130),
             Font = Enum.Font.GothamBold,
             TextSize = math.floor(11 * s),
-            FrameSize = UDim2.new(0, bW, 0, math.floor(30 * s)),
-            Pos = UDim2.new(0, math.floor(10 * s), 0, math.floor(94 * s)),
-            Radius = 8,
+            FrameSize = UDim2.new(0, bW, 0, math.floor(34 * s)),
+            Pos = UDim2.new(0, math.floor(10 * s), 0, math.floor(100 * s)),
+            Radius = THEME.RADIUS_MD,
+            StrokeColor = THEME.DANGER,
             Z = 302,
         })
-        local no = button(confirm, {
+        local no = makeButton(confirm, {
             Text = "Batal",
-            Color = THEME.ACCENT_DIM,
-            StrokeColor = THEME.ACCENT_DIM,
+            IdleColor = THEME.BTN_IDLE,
+            ActiveColor = THEME.ACCENT,
+            HoverColor = THEME.BTN_HOVER,
             Font = Enum.Font.GothamBold,
             TextSize = math.floor(11 * s),
-            FrameSize = UDim2.new(0, bW, 0, math.floor(30 * s)),
-            Pos = UDim2.new(0, math.floor(20 * s) + bW, 0, math.floor(94 * s)),
-            Radius = 8,
+            FrameSize = UDim2.new(0, bW, 0, math.floor(34 * s)),
+            Pos = UDim2.new(0, math.floor(20 * s) + bW, 0, math.floor(100 * s)),
+            Radius = THEME.RADIUS_MD,
+            StrokeColor = THEME.HAIRLINE,
             Z = 302,
         })
 
@@ -1052,10 +1233,11 @@ local function buildUI()
     minBtn.MouseButton1Click:Connect(function()
         main.Visible = false
         shadow.Visible = false
+        glow.Visible = false
         State.minimized = true
 
         if not State.kButton or not State.kButton.Parent then
-            local kS = math.floor(46 * s)
+            local kS = math.floor(50 * s)
             local k = Instance.new("TextButton")
             k.Name = "KButton"
             k.Size = UDim2.new(0, kS, 0, kS)
@@ -1064,8 +1246,8 @@ local function buildUI()
             k.BackgroundTransparency = THEME.BTN_TRANS
             k.Text = "K"
             k.TextColor3 = Color3.fromRGB(255, 255, 255)
-            k.Font = Enum.Font.GothamBlack
-            k.TextSize = math.floor(20 * s)
+            k.Font = Enum.Font.GothamBold
+            k.TextSize = math.floor(22 * s)
             k.BorderSizePixel = 0
             k.AutoButtonColor = false
             k.Active = true
@@ -1073,11 +1255,12 @@ local function buildUI()
             k.ZIndex = 50
             k.Parent = gui
             corner(k, kS/2)
-            stroke(k, Color3.fromRGB(255, 255, 255), 2, 0)
+            stroke(k, THEME.ACCENT_LITE, 1.5, 0.3)
 
             k.MouseButton1Click:Connect(function()
                 main.Visible = true
                 shadow.Visible = true
+                glow.Visible = true
                 State.minimized = false
                 k.Visible = false
             end)
@@ -1087,7 +1270,7 @@ local function buildUI()
     end)
 
     switchPage("home")
-    toast("Kei Selvim UI v1.1 loaded", THEME.SUCCESS)
+    toast("Kei Selvim UI v2.1 loaded", THEME.SUCCESS)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
