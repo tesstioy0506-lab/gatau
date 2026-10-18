@@ -1,92 +1,54 @@
 --[[
-    ╔══════════════════════════════════════════════════════════════════════╗
-    ║                                                                      ║
-    ║           KEI SELVIM — UI SHELL v3.0 FINAL                           ║
-    ║           Glassmorphism • Glyph Icons • State Buttons                ║
-    ║                                                                      ║
-    ╚══════════════════════════════════════════════════════════════════════╝
-
-    Yang ada di sini:
-    - ScreenGui + main frame + shadow + overlay
-    - Header (drag, close, minimize)
-    - Sidebar navigasi 4 tombol dengan glyph unicode
-    - 4 halaman (Home / Tools / Config / Crown)
-    - Toast notif
-    - K button (restore after minimize)
-
-    Icon pakai glyph unicode geometric (bukan emoji):
-      ⌂  house    ⚙  gear    ☰  list    ♛  crown
-      ◆  ✕  —  ▲  ●  ■
+    KEI SELVIM — UI SHELL v3.2 — GUARANTEED VISIBLE
+    - No Tween, No UIStroke, No ImageLabel, No UIGradient
+    - LocalPlayer di-fetch dengan aman (WaitForChild)
+    - Semua build dibungkus pcall, error muncul di console
+    - Layout manual yang anti-gagal
 ]]
 
--- ═══════════════════════════════════════════════════════════════════════
--- THEME
--- ═══════════════════════════════════════════════════════════════════════
-local THEME = {
-    BG_ASSET     = "rbxassetid://0",
-
-    -- Warna inti
-    ACCENT       = Color3.fromRGB(150, 80, 240),
-    ACCENT_LITE  = Color3.fromRGB(190, 145, 255),
-    ACCENT_DIM   = Color3.fromRGB(70, 35, 120),
-
-    -- Surface
-    SURFACE      = Color3.fromRGB(28, 28, 40),
-    SURFACE_2    = Color3.fromRGB(18, 18, 26),
-    SURFACE_3    = Color3.fromRGB(40, 40, 58),
-    BTN_IDLE     = Color3.fromRGB(48, 48, 66),
-    BTN_HOVER    = Color3.fromRGB(65, 65, 88),
-
-    -- Text
-    TEXT         = Color3.fromRGB(245, 245, 250),
-    TEXT_DIM     = Color3.fromRGB(170, 170, 195),
-    TEXT_FAINT   = Color3.fromRGB(120, 120, 145),
-
-    -- Status
-    DANGER       = Color3.fromRGB(240, 80, 105),
-    SUCCESS      = Color3.fromRGB(100, 220, 150),
-    GOLD         = Color3.fromRGB(255, 200, 60),
-
-    -- Transparansi
-    BG_TRANS     = 0.1,
-    PANEL_TRANS  = 0.2,
-    BTN_TRANS    = 0.1,
-
-    -- Ukuran
-    BASE_W       = 660,
-    BASE_H       = 440,
-    SIDEBAR_W    = 66,
-    HEADER_H     = 46,
-    PAD          = 14,
-    ICON_SIZE    = 42,
-    ICON_GAP     = 8,
-    RADIUS_LG    = 16,
-    RADIUS_MD    = 10,
-    RADIUS_SM    = 6,
-}
-
--- ═══════════════════════════════════════════════════════════════════════
--- SERVICES
--- ═══════════════════════════════════════════════════════════════════════
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService     = game:GetService("TweenService")
 local CoreGui          = game:GetService("CoreGui")
-local LocalPlayer      = Players.LocalPlayer
+
+-- Fetch LocalPlayer dengan aman
+local LocalPlayer
+if Players.LocalPlayer then
+    LocalPlayer = Players.LocalPlayer
+else
+    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+    LocalPlayer = Players.LocalPlayer
+end
 
 -- ═══════════════════════════════════════════════════════════════════════
--- STATE
+-- WARNA & UKURAN
 -- ═══════════════════════════════════════════════════════════════════════
-local State = {
-    screenGui = nil,
-    mainFrame = nil,
-    shadow = nil,
-    kButton = nil,
-    minimized = false,
-    currentPage = "home",
-    pages = {},
-    sidebarButtons = {},
-    scale = 1,
+local C = {
+    BG           = Color3.fromRGB(22, 22, 30),
+    HEADER       = Color3.fromRGB(32, 32, 46),
+    SIDEBAR      = Color3.fromRGB(18, 18, 26),
+    CONTENT      = Color3.fromRGB(26, 26, 38),
+    CARD         = Color3.fromRGB(36, 36, 52),
+    BTN_IDLE     = Color3.fromRGB(54, 54, 74),
+    BTN_ACTIVE   = Color3.fromRGB(150, 80, 240),
+    BTN_HOVER    = Color3.fromRGB(78, 78, 105),
+    TEXT         = Color3.fromRGB(245, 245, 250),
+    TEXT_DIM     = Color3.fromRGB(160, 160, 185),
+    ACCENT       = Color3.fromRGB(150, 80, 240),
+    ACCENT_LITE  = Color3.fromRGB(200, 160, 255),
+    DANGER       = Color3.fromRGB(240, 80, 105),
+    GOLD         = Color3.fromRGB(255, 200, 60),
+    GREEN        = Color3.fromRGB(100, 220, 150),
+    BLUE         = Color3.fromRGB(100, 180, 255),
+    PINK         = Color3.fromRGB(255, 130, 180),
+}
+
+local SIZE = {
+    W = 660, H = 440,
+    HEADER_H = 48,
+    SIDEBAR_W = 72,
+    ICON = 48,
+    ICON_GAP = 8,
+    PAD = 14,
 }
 
 -- ═══════════════════════════════════════════════════════════════════════
@@ -111,692 +73,411 @@ local function getParent()
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
--- UI HELPERS
+-- HELPERS
 -- ═══════════════════════════════════════════════════════════════════════
 local function corner(p, r)
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r or 8)
+    c.CornerRadius = UDim.new(0, r)
     c.Parent = p
     return c
 end
 
-local function stroke(p, col, thick, trans)
-    local s = Instance.new("UIStroke")
-    s.Color = col or THEME.TEXT_FAINT
-    s.Thickness = thick or 1
-    s.Transparency = trans or 0.85
-    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    s.Parent = p
-    return s
-end
-
-local function label(parent, props)
+local function mkLabel(parent, text, size, color, font, pos, sz, xalign)
     local l = Instance.new("TextLabel")
     l.BackgroundTransparency = 1
-    l.Text = props.Text or ""
-    l.TextColor3 = props.Color or THEME.TEXT
-    l.Font = props.Font or Enum.Font.Gotham
-    l.TextSize = props.Size or 13
-    l.TextXAlignment = props.XAlign or Enum.TextXAlignment.Left
-    l.TextYAlignment = props.YAlign or Enum.TextYAlignment.Center
-    l.Size = props.FrameSize or UDim2.new(1, 0, 1, 0)
-    l.Position = props.Pos or UDim2.new(0, 0, 0, 0)
-    l.TextWrapped = props.Wrap or false
-    l.ZIndex = props.Z or 5
-    l.Active = false
+    l.Text = text
+    l.TextSize = size
+    l.TextColor3 = color
+    l.Font = font or Enum.Font.Gotham
+    l.TextXAlignment = xalign or Enum.TextXAlignment.Left
+    l.TextYAlignment = Enum.TextYAlignment.Center
+    l.Position = pos or UDim2.new(0, 0, 0, 0)
+    l.Size = sz or UDim2.new(1, 0, 1, 0)
+    l.TextWrapped = false
     l.Parent = parent
     return l
 end
 
--- Button: idle abu, hover abu terang, active ungu
-local function makeButton(parent, props)
+local function mkButton(parent, text, size, color, fontSize)
     local b = Instance.new("TextButton")
-    b.Name = props.Name or "Btn"
-    b.BackgroundColor3 = props.IdleColor or THEME.BTN_IDLE
-    b.BackgroundTransparency = props.Trans or THEME.BTN_TRANS
-    b.Text = props.Text or ""
-    b.TextColor3 = props.TextColor or THEME.TEXT
-    b.Font = props.Font or Enum.Font.GothamSemibold
-    b.TextSize = props.TextSize or 12
-    b.Size = props.FrameSize or UDim2.new(1, 0, 0, 36)
-    b.Position = props.Pos or UDim2.new(0, 0, 0, 0)
+    b.Text = text
+    b.TextColor3 = C.TEXT
+    b.Font = Enum.Font.GothamSemibold
+    b.TextSize = fontSize or 12
+    b.BackgroundColor3 = color or C.BTN_IDLE
     b.BorderSizePixel = 0
     b.AutoButtonColor = false
-    b.Active = true
-    b.Selectable = true
-    b.ZIndex = props.Z or 5
+    b.Size = size
     b.Parent = parent
-    corner(b, props.Radius or THEME.RADIUS_MD)
-    local s = stroke(b, props.StrokeColor or THEME.TEXT_FAINT, 1, props.StrokeTrans or 0.85)
-
-    local isActive = false
-    local idleCol = props.IdleColor or THEME.BTN_IDLE
-    local hoverCol = props.HoverColor or THEME.BTN_HOVER
-    local activeCol = props.ActiveColor or THEME.ACCENT
-    local idleTrans = props.Trans or THEME.BTN_TRANS
-    local activeTrans = math.max(0, idleTrans - 0.05)
-
-    local function refresh(hovering)
-        local col, trans, st, tc
-        if isActive then
-            col, trans, st, tc = activeCol, activeTrans, 0.15, Color3.fromRGB(255, 255, 255)
-        elseif hovering then
-            col, trans, st, tc = hoverCol, idleTrans, 0.5, THEME.TEXT
-        else
-            col, trans, st, tc = idleCol, idleTrans, 0.85, props.TextColor or THEME.TEXT
-        end
-        TweenService:Create(b, TweenInfo.new(0.15), {
-            BackgroundColor3 = col,
-            BackgroundTransparency = trans,
-        }):Play()
-        TweenService:Create(s, TweenInfo.new(0.15), { Transparency = st }):Play()
-        TweenService:Create(b, TweenInfo.new(0.15), { TextColor3 = tc }):Play()
-    end
-
-    b.MouseEnter:Connect(function() refresh(true) end)
-    b.MouseLeave:Connect(function() refresh(false) end)
-
-    b.SetActive = function(v)
-        isActive = v and true or false
-        refresh(false)
-    end
-    b.GetActive = function() return isActive end
-
+    corner(b, 8)
     return b
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
--- ICON GLYPHS — unicode geometric murni (bukan emoji)
+-- STATE
 -- ═══════════════════════════════════════════════════════════════════════
-local ICON = {
-    home   = "⌂",
-    tools  = "⚙",
-    config = "☰",
-    crown  = "♛",
+local State = {
+    gui = nil,
+    main = nil,
+    kBtn = nil,
+    current = "home",
+    pages = {},
+    tabs = {},
+    tabColors = {},  -- simpan warna idle per tab (crown = gold)
 }
-
--- ═══════════════════════════════════════════════════════════════════════
--- TOAST
--- ═══════════════════════════════════════════════════════════════════════
-local function toast(msg, color)
-    if not State.screenGui then return end
-    local s = State.scale
-    local W = math.floor(340 * s)
-    local H = math.floor(46 * s)
-
-    local t = Instance.new("Frame")
-    t.Size = UDim2.new(0, W, 0, H)
-    t.Position = UDim2.new(0.5, -W/2, 1, 30)
-    t.BackgroundColor3 = THEME.SURFACE
-    t.BackgroundTransparency = 0.1
-    t.BorderSizePixel = 0
-    t.ZIndex = 200
-    t.Active = false
-    t.Parent = State.screenGui
-    corner(t, THEME.RADIUS_MD)
-    stroke(t, color or THEME.ACCENT_LITE, 1.5, 0.3)
-
-    local dot = Instance.new("Frame")
-    dot.Size = UDim2.new(0, math.floor(8 * s), 0, math.floor(8 * s))
-    dot.Position = UDim2.new(0, math.floor(14 * s), 0.5, -math.floor(4 * s))
-    dot.BackgroundColor3 = color or THEME.ACCENT_LITE
-    dot.BorderSizePixel = 0
-    dot.ZIndex = 202
-    dot.Parent = t
-    corner(dot, 4)
-
-    label(t, {
-        Text = msg,
-        Color = THEME.TEXT,
-        Font = Enum.Font.GothamMedium,
-        Size = math.floor(11 * s),
-        FrameSize = UDim2.new(1, -math.floor(36 * s), 1, 0),
-        Pos = UDim2.new(0, math.floor(30 * s), 0, 0),
-        Z = 201,
-    })
-
-    TweenService:Create(t, TweenInfo.new(0.4, Enum.EasingStyle.Quint),
-        { Position = UDim2.new(0.5, -W/2, 1, -66) }):Play()
-
-    task.delay(2.5, function()
-        if t and t.Parent then
-            TweenService:Create(t, TweenInfo.new(0.3),
-                { Position = UDim2.new(0.5, -W/2, 1, 30) }):Play()
-            task.wait(0.4)
-            t:Destroy()
-        end
-    end)
-end
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- BUILD UI
 -- ═══════════════════════════════════════════════════════════════════════
-local function buildUI()
-    local parentGui = getParent()
-    if not parentGui then
-        warn("[Kei] no parent gui")
+local function build()
+    local parent = getParent()
+    if not parent then
+        warn("[Kei] FATAL: no parent gui. gethui() failed and CoreGui protected.")
         return
     end
+    print("[Kei] parent ok:", parent:GetFullName())
 
     local vp = workspace.CurrentCamera.ViewportSize
-    local s
+    local s = 1
     if vp.X < 480 then s = 0.6
     elseif vp.X < 720 then s = 0.75
-    elseif vp.X < 1024 then s = 0.88
-    else s = 1 end
-    State.scale = s
+    elseif vp.X < 1024 then s = 0.88 end
 
-    local BW  = math.floor(THEME.BASE_W * s)
-    local BH  = math.floor(THEME.BASE_H * s)
-    local SBW = math.floor(THEME.SIDEBAR_W * s)
-    local HH  = math.floor(THEME.HEADER_H * s)
-    local PAD = math.floor(THEME.PAD * s)
-    local ICS = math.floor(THEME.ICON_SIZE * s)
-    local ICG = math.floor(THEME.ICON_GAP * s)
+    local W  = math.floor(SIZE.W * s)
+    local H  = math.floor(SIZE.H * s)
+    local HH = math.floor(SIZE.HEADER_H * s)
+    local SW = math.floor(SIZE.SIDEBAR_W * s)
+    local IC = math.floor(SIZE.ICON * s)
+    local IG = math.floor(SIZE.ICON_GAP * s)
+    local PD = math.floor(SIZE.PAD * s)
 
     -- ScreenGui
     local gui = Instance.new("ScreenGui")
     gui.Name = "KeiSelvimUI"
     gui.ResetOnSpawn = false
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.DisplayOrder = 2147483647
     gui.IgnoreGuiInset = true
-    gui.Parent = parentGui
-    State.screenGui = gui
-
-    -- Shadow
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(0, BW + 12, 0, BH + 12)
-    shadow.Position = UDim2.new(0.5, -(BW+12)/2, 0.5, -(BH+12)/2 + 5)
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.5
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = 1
-    shadow.Active = false
-    shadow.Parent = gui
-    corner(shadow, THEME.RADIUS_LG + 4)
-    State.shadow = shadow
+    gui.DisplayOrder = 2147483647
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = parent
+    State.gui = gui
+    print("[Kei] ScreenGui created")
 
     -- Main
     local main = Instance.new("Frame")
     main.Name = "Main"
-    main.Size = UDim2.new(0, BW, 0, BH)
-    main.Position = UDim2.new(0.5, -BW/2, 0.5, -BH/2)
-    main.BackgroundColor3 = THEME.SURFACE_2
-    main.BackgroundTransparency = THEME.BG_TRANS
+    main.Size = UDim2.new(0, W, 0, H)
+    main.Position = UDim2.new(0.5, -W/2, 0.5, -H/2)
+    main.BackgroundColor3 = C.BG
     main.BorderSizePixel = 0
-    main.ClipsDescendants = true
     main.Active = true
-    main.ZIndex = 3
+    main.ZIndex = 2
     main.Parent = gui
-    corner(main, THEME.RADIUS_LG)
-    stroke(main, THEME.ACCENT, 1.2, 0.55)
-    State.mainFrame = main
-
-    -- BG image (opsional)
-    if THEME.BG_ASSET ~= "rbxassetid://0" then
-        local bgImg = Instance.new("ImageLabel")
-        bgImg.Size = UDim2.new(1, 0, 1, 0)
-        bgImg.BackgroundTransparency = 1
-        bgImg.Image = THEME.BG_ASSET
-        bgImg.ScaleType = Enum.ScaleType.Crop
-        bgImg.ImageTransparency = THEME.BG_TRANS
-        bgImg.Active = false
-        bgImg.ZIndex = 2
-        bgImg.Parent = main
-        corner(bgImg, THEME.RADIUS_LG)
-    end
-
-    -- Dark overlay
-    local ov = Instance.new("Frame")
-    ov.Size = UDim2.new(1, 0, 1, 0)
-    ov.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
-    ov.BackgroundTransparency = 0.35
-    ov.BorderSizePixel = 0
-    ov.Active = false
-    ov.ZIndex = 3
-    ov.Parent = main
-    corner(ov, THEME.RADIUS_LG)
+    corner(main, 14)
+    State.main = main
+    print("[Kei] main frame created")
 
     -- ═══════════ HEADER ═══════════
     local header = Instance.new("Frame")
     header.Name = "Header"
     header.Size = UDim2.new(1, 0, 0, HH)
-    header.BackgroundColor3 = THEME.SURFACE
-    header.BackgroundTransparency = 0.15
+    header.BackgroundColor3 = C.HEADER
     header.BorderSizePixel = 0
     header.Active = true
-    header.ZIndex = 10
+    header.ZIndex = 5
     header.Parent = main
-    corner(header, THEME.RADIUS_LG)
+    corner(header, 14)
 
-    -- Logo diamond
-    label(header, {
-        Text = "◆",
-        Color = THEME.ACCENT_LITE,
-        Font = Enum.Font.GothamBold,
-        Size = math.floor(20 * s),
-        FrameSize = UDim2.new(0, math.floor(28 * s), 1, 0),
-        Pos = UDim2.new(0, math.floor(16 * s), 0, 0),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 11,
-    })
+    -- Logo
+    mkLabel(header, "◆", math.floor(22*s), C.ACCENT_LITE, Enum.Font.GothamBold,
+        UDim2.new(0, math.floor(16*s), 0, 0),
+        UDim2.new(0, math.floor(28*s), 1, 0),
+        Enum.TextXAlignment.Center)
 
-    label(header, {
-        Text = "KEI SELVIM",
-        Color = THEME.TEXT,
-        Font = Enum.Font.GothamBold,
-        Size = math.floor(13 * s),
-        FrameSize = UDim2.new(0, math.floor(120 * s), 0, math.floor(16 * s)),
-        Pos = UDim2.new(0, math.floor(48 * s), 0, math.floor(HH/2 - 10 * s)),
-        Z = 11,
-    })
+    -- Title
+    mkLabel(header, "KEI SELVIM", math.floor(14*s), C.TEXT, Enum.Font.GothamBold,
+        UDim2.new(0, math.floor(48*s), 0, math.floor(HH/2 - 11*s)),
+        UDim2.new(0, math.floor(140*s), 0, math.floor(16*s)))
 
-    label(header, {
-        Text = "SHELL v3.0",
-        Color = THEME.TEXT_FAINT,
-        Font = Enum.Font.GothamMedium,
-        Size = math.floor(9 * s),
-        FrameSize = UDim2.new(0, math.floor(120 * s), 0, math.floor(12 * s)),
-        Pos = UDim2.new(0, math.floor(49 * s), 0, math.floor(HH/2 + 6 * s)),
-        Z = 11,
-    })
+    mkLabel(header, "SHELL v3.2", math.floor(9*s), C.TEXT_DIM, Enum.Font.Gotham,
+        UDim2.new(0, math.floor(49*s), 0, math.floor(HH/2 + 3*s)),
+        UDim2.new(0, math.floor(140*s), 0, math.floor(12*s)))
 
     -- Version badge
     local badge = Instance.new("Frame")
-    badge.Size = UDim2.new(0, math.floor(42 * s), 0, math.floor(18 * s))
-    badge.Position = UDim2.new(0, math.floor(160 * s), 0, math.floor((HH - 18 * s)/2))
-    badge.BackgroundColor3 = THEME.ACCENT
-    badge.BackgroundTransparency = 0.4
+    badge.Size = UDim2.new(0, math.floor(46*s), 0, math.floor(20*s))
+    badge.Position = UDim2.new(0, math.floor(196*s), 0, math.floor((HH - 20*s)/2))
+    badge.BackgroundColor3 = C.ACCENT
     badge.BorderSizePixel = 0
-    badge.Active = false
-    badge.ZIndex = 11
+    badge.ZIndex = 6
     badge.Parent = header
-    corner(badge, 9)
-    stroke(badge, THEME.ACCENT_LITE, 1, 0.4)
-    label(badge, {
-        Text = "v3.0",
-        Color = Color3.fromRGB(255, 255, 255),
-        Font = Enum.Font.GothamBold,
-        Size = math.floor(9 * s),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 12,
-    })
+    corner(badge, 10)
+    mkLabel(badge, "v3.2", math.floor(9*s), Color3.fromRGB(255,255,255), Enum.Font.GothamBold,
+        UDim2.new(0,0,0,0), UDim2.new(1,0,1,0), Enum.TextXAlignment.Center)
 
     -- Close button
-    local btnS = math.floor(30 * s)
-    local closeBtn = makeButton(header, {
-        Name = "Close",
-        Text = "✕",
-        IdleColor = THEME.BTN_IDLE,
-        HoverColor = THEME.DANGER,
-        ActiveColor = THEME.DANGER,
-        Font = Enum.Font.GothamBold,
-        TextSize = math.floor(13 * s),
-        FrameSize = UDim2.new(0, btnS, 0, btnS),
-        Pos = UDim2.new(1, -math.floor(40 * s), 0, math.floor((HH - btnS)/2)),
-        Radius = THEME.RADIUS_SM,
-        Z = 11,
-    })
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, math.floor(34*s), 0, math.floor(34*s))
+    closeBtn.Position = UDim2.new(1, -math.floor(44*s), 0, math.floor((HH - 34*s)/2))
+    closeBtn.BackgroundColor3 = C.DANGER
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = math.floor(15*s)
+    closeBtn.BorderSizePixel = 0
+    closeBtn.AutoButtonColor = false
+    closeBtn.ZIndex = 10
+    closeBtn.Parent = header
+    corner(closeBtn, 6)
 
     -- Minimize button
-    local minBtn = makeButton(header, {
-        Name = "Minimize",
-        Text = "—",
-        IdleColor = THEME.BTN_IDLE,
-        HoverColor = THEME.BTN_HOVER,
-        Font = Enum.Font.GothamBold,
-        TextSize = math.floor(14 * s),
-        FrameSize = UDim2.new(0, btnS, 0, btnS),
-        Pos = UDim2.new(1, -math.floor(76 * s), 0, math.floor((HH - btnS)/2)),
-        Radius = THEME.RADIUS_SM,
-        Z = 11,
-    })
+    local minBtn = Instance.new("TextButton")
+    minBtn.Size = UDim2.new(0, math.floor(34*s), 0, math.floor(34*s))
+    minBtn.Position = UDim2.new(1, -math.floor(84*s), 0, math.floor((HH - 34*s)/2))
+    minBtn.BackgroundColor3 = C.BTN_IDLE
+    minBtn.Text = "—"
+    minBtn.TextColor3 = C.TEXT
+    minBtn.Font = Enum.Font.GothamBold
+    minBtn.TextSize = math.floor(18*s)
+    minBtn.BorderSizePixel = 0
+    minBtn.AutoButtonColor = false
+    minBtn.ZIndex = 10
+    minBtn.Parent = header
+    corner(minBtn, 6)
 
     -- ═══════════ SIDEBAR ═══════════
     local sidebar = Instance.new("Frame")
     sidebar.Name = "Sidebar"
-    sidebar.Size = UDim2.new(0, SBW, 1, -HH)
+    sidebar.Size = UDim2.new(0, SW, 1, -HH)
     sidebar.Position = UDim2.new(0, 0, 0, HH)
-    sidebar.BackgroundColor3 = Color3.fromRGB(14, 14, 20)
-    sidebar.BackgroundTransparency = 0.2
+    sidebar.BackgroundColor3 = C.SIDEBAR
     sidebar.BorderSizePixel = 0
-    sidebar.Active = false
-    sidebar.ZIndex = 10
+    sidebar.ZIndex = 4
     sidebar.Parent = main
 
     -- ═══════════ CONTENT ═══════════
     local content = Instance.new("Frame")
     content.Name = "Content"
-    content.Size = UDim2.new(1, -(SBW + PAD*2), 1, -(HH + PAD*2))
-    content.Position = UDim2.new(0, SBW + PAD, 0, HH + PAD)
-    content.BackgroundTransparency = 1
-    content.Active = false
-    content.ZIndex = 10
+    content.Size = UDim2.new(1, -(SW + PD*2), 1, -(HH + PD*2))
+    content.Position = UDim2.new(0, SW + PD, 0, HH + PD)
+    content.BackgroundColor3 = C.CONTENT
+    content.BorderSizePixel = 0
+    content.ZIndex = 4
     content.Parent = main
+    corner(content, 10)
 
-    -- ═══════════ PAGES ═══════════
+    -- ═══════════ PAGE FACTORY ═══════════
     local function makePage(id, title, subtitle)
         local p = Instance.new("Frame")
         p.Name = id .. "Page"
         p.Size = UDim2.new(1, 0, 1, 0)
         p.BackgroundTransparency = 1
         p.Visible = false
-        p.Active = false
-        p.ZIndex = 10
+        p.ZIndex = 5
         p.Parent = content
 
-        label(p, {
-            Text = title,
-            Color = THEME.TEXT,
-            Font = Enum.Font.GothamBold,
-            Size = math.floor(16 * s),
-            FrameSize = UDim2.new(1, 0, 0, math.floor(24 * s)),
-            Pos = UDim2.new(0, 0, 0, 0),
-            Z = 11,
-        })
-        if subtitle then
-            label(p, {
-                Text = subtitle,
-                Color = THEME.TEXT_DIM,
-                Font = Enum.Font.Gotham,
-                Size = math.floor(10 * s),
-                FrameSize = UDim2.new(1, 0, 0, math.floor(16 * s)),
-                Pos = UDim2.new(0, 0, 0, math.floor(28 * s)),
-                Z = 11,
-            })
-        end
+        mkLabel(p, title, math.floor(18*s), C.TEXT, Enum.Font.GothamBold,
+            UDim2.new(0, math.floor(16*s), 0, math.floor(12*s)),
+            UDim2.new(1, -math.floor(32*s), 0, math.floor(24*s)))
+
+        mkLabel(p, subtitle, math.floor(11*s), C.TEXT_DIM, Enum.Font.Gotham,
+            UDim2.new(0, math.floor(17*s), 0, math.floor(38*s)),
+            UDim2.new(1, -math.floor(32*s), 0, math.floor(16*s)))
 
         local body = Instance.new("Frame")
-        body.Name = "Body"
-        body.Size = UDim2.new(1, 0, 1, -math.floor(56 * s))
-        body.Position = UDim2.new(0, 0, 0, math.floor(56 * s))
+        body.Size = UDim2.new(1, -math.floor(32*s), 1, -math.floor(74*s))
+        body.Position = UDim2.new(0, math.floor(16*s), 0, math.floor(64*s))
         body.BackgroundTransparency = 1
-        body.Active = false
-        body.ZIndex = 11
+        body.ZIndex = 6
         body.Parent = p
 
         State.pages[id] = p
         return body
     end
 
-    -- HOME
+    -- ─── HOME ───
     local homeBody = makePage("home", "Home", "Dashboard & info")
 
-    local profileCard = Instance.new("Frame")
-    profileCard.Size = UDim2.new(1, 0, 0, math.floor(72 * s))
-    profileCard.BackgroundColor3 = THEME.SURFACE
-    profileCard.BackgroundTransparency = THEME.PANEL_TRANS
-    profileCard.BorderSizePixel = 0
-    profileCard.Active = false
-    profileCard.ZIndex = 12
-    profileCard.Parent = homeBody
-    corner(profileCard, THEME.RADIUS_MD)
-    stroke(profileCard, THEME.TEXT_FAINT, 1, 0.8)
+    -- Profile card
+    local profile = Instance.new("Frame")
+    profile.Size = UDim2.new(1, 0, 0, math.floor(76*s))
+    profile.BackgroundColor3 = C.CARD
+    profile.BorderSizePixel = 0
+    profile.ZIndex = 7
+    profile.Parent = homeBody
+    corner(profile, 10)
 
-    local av = Instance.new("ImageLabel")
-    av.Size = UDim2.new(0, math.floor(52 * s), 0, math.floor(52 * s))
-    av.Position = UDim2.new(0, math.floor(12 * s), 0.5, -math.floor(26 * s))
-    av.BackgroundColor3 = THEME.SURFACE_3
-    av.BackgroundTransparency = 0.2
-    av.BorderSizePixel = 0
-    av.Active = false
-    av.ZIndex = 13
-    av.Parent = profileCard
-    corner(av, math.floor(26 * s))
-    stroke(av, THEME.ACCENT_LITE, 1.5, 0.3)
+    mkLabel(profile, "◆", math.floor(32*s), C.ACCENT_LITE, Enum.Font.GothamBold,
+        UDim2.new(0, math.floor(14*s), 0, 0),
+        UDim2.new(0, math.floor(56*s), 1, 0),
+        Enum.TextXAlignment.Center)
 
-    task.spawn(function()
-        if LocalPlayer then
-            local ok, thumb = pcall(function()
-                return Players:GetUserThumbnailAsync(LocalPlayer.UserId,
-                    Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
-            end)
-            if ok and thumb then av.Image = thumb end
-        end
-    end)
+    mkLabel(profile, (LocalPlayer and LocalPlayer.DisplayName) or "Player",
+        math.floor(15*s), C.TEXT, Enum.Font.GothamBold,
+        UDim2.new(0, math.floor(80*s), 0, math.floor(14*s)),
+        UDim2.new(1, -math.floor(96*s), 0, math.floor(18*s)))
 
-    label(profileCard, {
-        Text = LocalPlayer and LocalPlayer.DisplayName or "Unknown",
-        Color = THEME.TEXT,
-        Font = Enum.Font.GothamBold,
-        Size = math.floor(13 * s),
-        FrameSize = UDim2.new(1, -math.floor(80 * s), 0, math.floor(18 * s)),
-        Pos = UDim2.new(0, math.floor(76 * s), 0, math.floor(14 * s)),
-        Z = 13,
-    })
-    label(profileCard, {
-        Text = "@" .. (LocalPlayer and LocalPlayer.Name or "unknown"),
-        Color = THEME.TEXT_DIM,
-        Font = Enum.Font.Gotham,
-        Size = math.floor(10 * s),
-        FrameSize = UDim2.new(1, -math.floor(80 * s), 0, math.floor(14 * s)),
-        Pos = UDim2.new(0, math.floor(76 * s), 0, math.floor(32 * s)),
-        Z = 13,
-    })
-    label(profileCard, {
-        Text = "Kei Selvim  ·  Shell v3.0",
-        Color = THEME.ACCENT_LITE,
-        Font = Enum.Font.GothamMedium,
-        Size = math.floor(9 * s),
-        FrameSize = UDim2.new(1, -math.floor(80 * s), 0, math.floor(14 * s)),
-        Pos = UDim2.new(0, math.floor(76 * s), 0, math.floor(48 * s)),
-        Z = 13,
-    })
+    mkLabel(profile, "@" .. ((LocalPlayer and LocalPlayer.Name) or "player"),
+        math.floor(11*s), C.TEXT_DIM, Enum.Font.Gotham,
+        UDim2.new(0, math.floor(80*s), 0, math.floor(34*s)),
+        UDim2.new(1, -math.floor(96*s), 0, math.floor(14*s)))
 
-    -- Stat grid
-    local statsGrid = Instance.new("Frame")
-    statsGrid.Size = UDim2.new(1, 0, 0, math.floor(140 * s))
-    statsGrid.Position = UDim2.new(0, 0, 0, math.floor(84 * s))
-    statsGrid.BackgroundTransparency = 1
-    statsGrid.Active = false
-    statsGrid.ZIndex = 12
-    statsGrid.Parent = homeBody
+    mkLabel(profile, "Kei Selvim  ·  Shell v3.2",
+        math.floor(10*s), C.ACCENT_LITE, Enum.Font.GothamMedium,
+        UDim2.new(0, math.floor(80*s), 0, math.floor(52*s)),
+        UDim2.new(1, -math.floor(96*s), 0, math.floor(14*s)))
+
+    -- Stat cards (pakai grid layout)
+    local statsHolder = Instance.new("Frame")
+    statsHolder.Size = UDim2.new(1, 0, 0, math.floor(148*s))
+    statsHolder.Position = UDim2.new(0, 0, 0, math.floor(86*s))
+    statsHolder.BackgroundTransparency = 1
+    statsHolder.ZIndex = 7
+    statsHolder.Parent = homeBody
 
     local grid = Instance.new("UIGridLayout")
-    grid.CellSize = UDim2.new(0.5, -math.floor(6 * s), 0, math.floor(64 * s))
-    grid.CellPadding = UDim2.new(0, math.floor(12 * s), 0, math.floor(10 * s))
+    grid.CellSize = UDim2.new(0.5, -math.floor(6*s), 0, math.floor(66*s))
+    grid.CellPadding = UDim2.new(0, math.floor(12*s), 0, math.floor(10*s))
     grid.SortOrder = Enum.SortOrder.LayoutOrder
-    grid.Parent = statsGrid
+    grid.Parent = statsHolder
 
-    local function statCard(order, title, value, color, symbol)
-        local card = Instance.new("Frame")
-        card.BackgroundColor3 = THEME.SURFACE
-        card.BackgroundTransparency = THEME.PANEL_TRANS
-        card.BorderSizePixel = 0
-        card.LayoutOrder = order
-        card.Active = false
-        card.ZIndex = 13
-        card.Parent = statsGrid
-        corner(card, THEME.RADIUS_MD)
-        stroke(card, THEME.TEXT_FAINT, 1, 0.8)
-
-        local barF = Instance.new("Frame")
-        barF.Size = UDim2.new(0, math.floor(3 * s), 1, -math.floor(20 * s))
-        barF.Position = UDim2.new(0, 0, 0, math.floor(10 * s))
-        barF.BackgroundColor3 = color
-        barF.BorderSizePixel = 0
-        barF.ZIndex = 14
-        barF.Parent = card
-        corner(barF, 2)
-
-        label(card, {
-            Text = title,
-            Color = THEME.TEXT_DIM,
-            Font = Enum.Font.GothamMedium,
-            Size = math.floor(9 * s),
-            FrameSize = UDim2.new(1, -math.floor(50 * s), 0, math.floor(14 * s)),
-            Pos = UDim2.new(0, math.floor(14 * s), 0, math.floor(10 * s)),
-            Z = 14,
-        })
-        label(card, {
-            Text = value,
-            Color = color,
-            Font = Enum.Font.GothamBold,
-            Size = math.floor(18 * s),
-            FrameSize = UDim2.new(1, -math.floor(50 * s), 0, math.floor(26 * s)),
-            Pos = UDim2.new(0, math.floor(14 * s), 0, math.floor(28 * s)),
-            Z = 14,
-        })
-        label(card, {
-            Text = symbol,
-            Color = color,
-            Font = Enum.Font.GothamBold,
-            Size = math.floor(18 * s),
-            FrameSize = UDim2.new(0, math.floor(30 * s), 0, math.floor(30 * s)),
-            Pos = UDim2.new(1, -math.floor(40 * s), 0, math.floor(14 * s)),
-            XAlign = Enum.TextXAlignment.Center,
-            Z = 14,
-        })
-    end
-
-    statCard(1, "FPS",     "60",      Color3.fromRGB(100, 255, 150), "▲")
-    statCard(2, "PING",    "0 ms",    Color3.fromRGB(255, 200, 100), "●")
-    statCard(3, "STATUS",  "Ready",   Color3.fromRGB(150, 200, 255), "◆")
-    statCard(4, "MODE",    "UI Only", Color3.fromRGB(255, 150, 200), "■")
-
-    -- TOOLS
-    local toolsBody = makePage("tools", "Tools", "Function panel")
-    local toolsCard = Instance.new("Frame")
-    toolsCard.Size = UDim2.new(1, 0, 0, math.floor(170 * s))
-    toolsCard.BackgroundColor3 = THEME.SURFACE
-    toolsCard.BackgroundTransparency = THEME.PANEL_TRANS
-    toolsCard.BorderSizePixel = 0
-    toolsCard.Active = false
-    toolsCard.ZIndex = 12
-    toolsCard.Parent = toolsBody
-    corner(toolsCard, THEME.RADIUS_MD)
-    stroke(toolsCard, THEME.TEXT_FAINT, 1, 0.8)
-
-    label(toolsCard, {
-        Text = "⚙",
-        Color = THEME.ACCENT_LITE,
-        Font = Enum.Font.GothamBold,
-        Size = math.floor(36 * s),
-        FrameSize = UDim2.new(1, 0, 0, math.floor(48 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(18 * s)),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 13,
-    })
-    label(toolsCard, {
-        Text = "Tools panel — logic di sini nanti",
-        Color = THEME.TEXT_DIM,
-        Font = Enum.Font.Gotham,
-        Size = math.floor(11 * s),
-        FrameSize = UDim2.new(1, 0, 0, math.floor(20 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(72 * s)),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 13,
-    })
-
-    local sampleActive = false
-    local sampleBtn = makeButton(toolsCard, {
-        Text = "Sample Button",
-        FrameSize = UDim2.new(1, -math.floor(40 * s), 0, math.floor(36 * s)),
-        Pos = UDim2.new(0, math.floor(20 * s), 0, math.floor(110 * s)),
-        TextSize = math.floor(11 * s),
-        Z = 13,
-    })
-    sampleBtn.MouseButton1Click:Connect(function()
-        sampleActive = not sampleActive
-        sampleBtn.SetActive(sampleActive)
-        toast(sampleActive and "Sample: ON" or "Sample: OFF",
-            sampleActive and THEME.ACCENT_LITE or THEME.TEXT_DIM)
-    end)
-
-    -- CONFIG
-    local configBody = makePage("config", "Config", "Settings panel")
-    local configCard = Instance.new("Frame")
-    configCard.Size = UDim2.new(1, 0, 0, math.floor(130 * s))
-    configCard.BackgroundColor3 = THEME.SURFACE
-    configCard.BackgroundTransparency = THEME.PANEL_TRANS
-    configCard.BorderSizePixel = 0
-    configCard.Active = false
-    configCard.ZIndex = 12
-    configCard.Parent = configBody
-    corner(configCard, THEME.RADIUS_MD)
-    stroke(configCard, THEME.TEXT_FAINT, 1, 0.8)
-
-    label(configCard, {
-        Text = "☰",
-        Color = THEME.ACCENT_LITE,
-        Font = Enum.Font.GothamBold,
-        Size = math.floor(36 * s),
-        FrameSize = UDim2.new(1, 0, 0, math.floor(48 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(18 * s)),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 13,
-    })
-    label(configCard, {
-        Text = "Config panel — logic di sini nanti",
-        Color = THEME.TEXT_DIM,
-        Font = Enum.Font.Gotham,
-        Size = math.floor(11 * s),
-        FrameSize = UDim2.new(1, 0, 0, math.floor(20 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(74 * s)),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 13,
-    })
-
-    -- CROWN
-    local crownBody = makePage("crown", "Crown", "Admin panel")
-    local crownCard = Instance.new("Frame")
-    crownCard.Size = UDim2.new(1, 0, 0, math.floor(130 * s))
-    crownCard.BackgroundColor3 = THEME.SURFACE
-    crownCard.BackgroundTransparency = THEME.PANEL_TRANS
-    crownCard.BorderSizePixel = 0
-    crownCard.Active = false
-    crownCard.ZIndex = 12
-    crownCard.Parent = crownBody
-    corner(crownCard, THEME.RADIUS_MD)
-    stroke(crownCard, THEME.GOLD, 1, 0.6)
-
-    label(crownCard, {
-        Text = "♛",
-        Color = THEME.GOLD,
-        Font = Enum.Font.GothamBold,
-        Size = math.floor(36 * s),
-        FrameSize = UDim2.new(1, 0, 0, math.floor(48 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(18 * s)),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 13,
-    })
-    label(crownCard, {
-        Text = "Admin panel — logic di sini nanti",
-        Color = THEME.GOLD,
-        Font = Enum.Font.Gotham,
-        Size = math.floor(11 * s),
-        FrameSize = UDim2.new(1, 0, 0, math.floor(20 * s)),
-        Pos = UDim2.new(0, 0, 0, math.floor(74 * s)),
-        XAlign = Enum.TextXAlignment.Center,
-        Z = 13,
-    })
-
-    -- ═══════════ SIDEBAR BUTTONS ═══════════
-    local iconList = {
-        { id = "home",   glyph = ICON.home,   color = THEME.TEXT },
-        { id = "tools",  glyph = ICON.tools,  color = THEME.TEXT },
-        { id = "config", glyph = ICON.config, color = THEME.TEXT },
-        { id = "crown",  glyph = ICON.crown,  color = THEME.GOLD },
+    local statData = {
+        {title = "FPS", value = "60", color = C.GREEN, sym = "▲"},
+        {title = "PING", value = "0 ms", color = C.GOLD, sym = "●"},
+        {title = "STATUS", value = "Ready", color = C.BLUE, sym = "◆"},
+        {title = "MODE", value = "UI Only", color = C.PINK, sym = "■"},
     }
 
-    local iconY = math.floor(14 * s)
-    for i, item in ipairs(iconList) do
-        local btn = makeButton(sidebar, {
-            Name = item.id .. "Btn",
-            Text = item.glyph,
-            TextColor = item.color,
-            IdleColor = THEME.BTN_IDLE,
-            HoverColor = THEME.BTN_HOVER,
-            ActiveColor = THEME.ACCENT,
-            Font = Enum.Font.GothamBold,
-            TextSize = math.floor(22 * s),
-            FrameSize = UDim2.new(0, ICS, 0, ICS),
-            Pos = UDim2.new(0, math.floor((SBW - ICS)/2), 0, iconY + (i-1) * (ICS + ICG)),
-            Radius = THEME.RADIUS_MD,
-            Z = 12,
-        })
-        State.sidebarButtons[item.id] = btn
+    for i, d in ipairs(statData) do
+        local card = Instance.new("Frame")
+        card.LayoutOrder = i
+        card.BackgroundColor3 = C.CARD
+        card.BorderSizePixel = 0
+        card.ZIndex = 8
+        card.Parent = statsHolder
+        corner(card, 10)
+
+        mkLabel(card, d.title, math.floor(10*s), C.TEXT_DIM, Enum.Font.Gotham,
+            UDim2.new(0, math.floor(14*s), 0, math.floor(10*s)),
+            UDim2.new(1, -math.floor(54*s), 0, math.floor(14*s)))
+
+        mkLabel(card, d.value, math.floor(20*s), d.color, Enum.Font.GothamBold,
+            UDim2.new(0, math.floor(14*s), 0, math.floor(28*s)),
+            UDim2.new(1, -math.floor(54*s), 0, math.floor(28*s)))
+
+        mkLabel(card, d.sym, math.floor(20*s), d.color, Enum.Font.GothamBold,
+            UDim2.new(1, -math.floor(42*s), 0, math.floor(16*s)),
+            UDim2.new(0, math.floor(34*s), 0, math.floor(34*s)),
+            Enum.TextXAlignment.Center)
+    end
+
+    -- ─── TOOLS ───
+    local toolsBody = makePage("tools", "Tools", "Function panel")
+    local toolsCard = Instance.new("Frame")
+    toolsCard.Size = UDim2.new(1, 0, 0, math.floor(200*s))
+    toolsCard.BackgroundColor3 = C.CARD
+    toolsCard.BorderSizePixel = 0
+    toolsCard.ZIndex = 7
+    toolsCard.Parent = toolsBody
+    corner(toolsCard, 10)
+
+    mkLabel(toolsCard, "⚙", math.floor(56*s), C.ACCENT_LITE, Enum.Font.GothamBold,
+        UDim2.new(0, 0, 0, math.floor(20*s)),
+        UDim2.new(1, 0, 0, math.floor(60*s)),
+        Enum.TextXAlignment.Center)
+
+    mkLabel(toolsCard, "Tools panel — siap diisi logic",
+        math.floor(12*s), C.TEXT_DIM, Enum.Font.Gotham,
+        UDim2.new(0, 0, 0, math.floor(88*s)),
+        UDim2.new(1, 0, 0, math.floor(20*s)),
+        Enum.TextXAlignment.Center)
+
+    local sampleBtn = mkButton(toolsCard, "Sample Button",
+        UDim2.new(1, -math.floor(40*s), 0, math.floor(42*s)),
+        C.BTN_IDLE, math.floor(12*s))
+    sampleBtn.Position = UDim2.new(0, math.floor(20*s), 0, math.floor(126*s))
+    sampleBtn.ZIndex = 8
+
+    local sampleOn = false
+    sampleBtn.MouseButton1Click:Connect(function()
+        sampleOn = not sampleOn
+        sampleBtn.BackgroundColor3 = sampleOn and C.ACCENT or C.BTN_IDLE
+        sampleBtn.Text = sampleOn and "Sample — ON" or "Sample Button"
+    end)
+    sampleBtn.MouseEnter:Connect(function()
+        if not sampleOn then sampleBtn.BackgroundColor3 = C.BTN_HOVER end
+    end)
+    sampleBtn.MouseLeave:Connect(function()
+        if not sampleOn then sampleBtn.BackgroundColor3 = C.BTN_IDLE end
+    end)
+
+    -- ─── CONFIG ───
+    local configBody = makePage("config", "Config", "Settings panel")
+    local configCard = Instance.new("Frame")
+    configCard.Size = UDim2.new(1, 0, 0, math.floor(150*s))
+    configCard.BackgroundColor3 = C.CARD
+    configCard.BorderSizePixel = 0
+    configCard.ZIndex = 7
+    configCard.Parent = configBody
+    corner(configCard, 10)
+
+    mkLabel(configCard, "☰", math.floor(56*s), C.ACCENT_LITE, Enum.Font.GothamBold,
+        UDim2.new(0, 0, 0, math.floor(20*s)),
+        UDim2.new(1, 0, 0, math.floor(60*s)),
+        Enum.TextXAlignment.Center)
+
+    mkLabel(configCard, "Config panel — siap diisi logic",
+        math.floor(12*s), C.TEXT_DIM, Enum.Font.Gotham,
+        UDim2.new(0, 0, 0, math.floor(92*s)),
+        UDim2.new(1, 0, 0, math.floor(20*s)),
+        Enum.TextXAlignment.Center)
+
+    -- ─── CROWN ───
+    local crownBody = makePage("crown", "Crown", "Admin panel")
+    local crownCard = Instance.new("Frame")
+    crownCard.Size = UDim2.new(1, 0, 0, math.floor(150*s))
+    crownCard.BackgroundColor3 = C.CARD
+    crownCard.BorderSizePixel = 0
+    crownCard.ZIndex = 7
+    crownCard.Parent = crownBody
+    corner(crownCard, 10)
+
+    mkLabel(crownCard, "♛", math.floor(56*s), C.GOLD, Enum.Font.GothamBold,
+        UDim2.new(0, 0, 0, math.floor(20*s)),
+        UDim2.new(1, 0, 0, math.floor(60*s)),
+        Enum.TextXAlignment.Center)
+
+    mkLabel(crownCard, "Admin panel — siap diisi logic",
+        math.floor(12*s), C.GOLD, Enum.Font.Gotham,
+        UDim2.new(0, 0, 0, math.floor(92*s)),
+        UDim2.new(1, 0, 0, math.floor(20*s)),
+        Enum.TextXAlignment.Center)
+
+    -- ═══════════ SIDEBAR TABS ═══════════
+    local tabs = {
+        { id = "home",   glyph = "⌂", idleCol = C.TEXT },
+        { id = "tools",  glyph = "⚙", idleCol = C.TEXT },
+        { id = "config", glyph = "☰", idleCol = C.TEXT },
+        { id = "crown",  glyph = "♛", idleCol = C.GOLD },
+    }
+
+    local startY = math.floor(14*s)
+    for i, tab in ipairs(tabs) do
+        local btn = Instance.new("TextButton")
+        btn.Name = tab.id .. "Tab"
+        btn.Size = UDim2.new(0, IC, 0, IC)
+        btn.Position = UDim2.new(0, math.floor((SW - IC)/2), 0, startY + (i-1) * (IC + IG))
+        btn.BackgroundColor3 = C.BTN_IDLE
+        btn.Text = tab.glyph
+        btn.TextColor3 = tab.idleCol
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = math.floor(26*s)
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.ZIndex = 8
+        btn.Parent = sidebar
+        corner(btn, 8)
+        State.tabs[tab.id] = btn
+        State.tabColors[tab.id] = tab.idleCol
     end
 
     -- ═══════════ PAGE SWITCH ═══════════
@@ -804,15 +485,31 @@ local function buildUI()
         for pid, page in pairs(State.pages) do
             page.Visible = (pid == id)
         end
-        for bid, btn in pairs(State.sidebarButtons) do
-            btn.SetActive(bid == id)
+        for tid, btn in pairs(State.tabs) do
+            if tid == id then
+                btn.BackgroundColor3 = C.BTN_ACTIVE
+                btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                btn.BackgroundColor3 = C.BTN_IDLE
+                btn.TextColor3 = State.tabColors[tid] or C.TEXT
+            end
         end
-        State.currentPage = id
+        State.current = id
     end
 
-    for id, btn in pairs(State.sidebarButtons) do
+    for id, btn in pairs(State.tabs) do
         btn.MouseButton1Click:Connect(function()
             switchPage(id)
+        end)
+        btn.MouseEnter:Connect(function()
+            if State.current ~= id then
+                btn.BackgroundColor3 = C.BTN_HOVER
+            end
+        end)
+        btn.MouseLeave:Connect(function()
+            if State.current ~= id then
+                btn.BackgroundColor3 = C.BTN_IDLE
+            end
         end)
     end
 
@@ -829,14 +526,10 @@ local function buildUI()
     header.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
             or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
+            local d = input.Position - dragStart
             main.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
-            shadow.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X - 6,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y - 1
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
             )
         end
     end)
@@ -849,94 +542,61 @@ local function buildUI()
 
     -- ═══════════ CLOSE ═══════════
     closeBtn.MouseButton1Click:Connect(function()
-        local cW = math.floor(320 * s)
-        local cH = math.floor(160 * s)
+        local cW = math.floor(310*s)
+        local cH = math.floor(160*s)
         local confirm = Instance.new("Frame")
         confirm.Size = UDim2.new(0, cW, 0, cH)
         confirm.Position = UDim2.new(0.5, -cW/2, 0.5, -cH/2)
-        confirm.BackgroundColor3 = THEME.SURFACE_2
-        confirm.BackgroundTransparency = 0.05
+        confirm.BackgroundColor3 = C.HEADER
         confirm.BorderSizePixel = 0
-        confirm.Active = true
-        confirm.ZIndex = 300
+        confirm.ZIndex = 100
         confirm.Parent = gui
-        corner(confirm, THEME.RADIUS_LG)
-        stroke(confirm, THEME.DANGER, 1.5, 0.2)
+        corner(confirm, 12)
 
-        label(confirm, {
-            Text = "Konfirmasi",
-            Color = THEME.TEXT,
-            Font = Enum.Font.GothamBold,
-            Size = math.floor(15 * s),
-            FrameSize = UDim2.new(1, 0, 0, math.floor(28 * s)),
-            Pos = UDim2.new(0, 0, 0, math.floor(18 * s)),
-            XAlign = Enum.TextXAlignment.Center,
-            Z = 301,
-        })
-        label(confirm, {
-            Text = "Yakin mau tutup Kei Selvim?",
-            Color = THEME.TEXT_DIM,
-            Font = Enum.Font.Gotham,
-            Size = math.floor(11 * s),
-            FrameSize = UDim2.new(1, -20, 0, math.floor(40 * s)),
-            Pos = UDim2.new(0, 10, 0, math.floor(52 * s)),
-            XAlign = Enum.TextXAlignment.Center,
-            Wrap = true,
-            Z = 301,
-        })
+        mkLabel(confirm, "Konfirmasi", math.floor(15*s), C.TEXT, Enum.Font.GothamBold,
+            UDim2.new(0, 0, 0, math.floor(18*s)),
+            UDim2.new(1, 0, 0, math.floor(24*s)),
+            Enum.TextXAlignment.Center)
 
-        local bW = (cW - math.floor(30 * s)) / 2
-        local yes = makeButton(confirm, {
-            Text = "Ya, Tutup",
-            IdleColor = THEME.DANGER,
-            ActiveColor = THEME.DANGER,
-            HoverColor = Color3.fromRGB(255, 110, 135),
-            TextColor = Color3.fromRGB(255, 255, 255),
-            Font = Enum.Font.GothamBold,
-            TextSize = math.floor(11 * s),
-            FrameSize = UDim2.new(0, bW, 0, math.floor(34 * s)),
-            Pos = UDim2.new(0, math.floor(10 * s), 0, math.floor(106 * s)),
-            Radius = THEME.RADIUS_MD,
-            Z = 301,
-        })
-        local no = makeButton(confirm, {
-            Text = "Batal",
-            IdleColor = THEME.BTN_IDLE,
-            ActiveColor = THEME.ACCENT,
-            HoverColor = THEME.BTN_HOVER,
-            Font = Enum.Font.GothamBold,
-            TextSize = math.floor(11 * s),
-            FrameSize = UDim2.new(0, bW, 0, math.floor(34 * s)),
-            Pos = UDim2.new(0, math.floor(20 * s) + bW, 0, math.floor(106 * s)),
-            Radius = THEME.RADIUS_MD,
-            Z = 301,
-        })
+        mkLabel(confirm, "Yakin mau tutup Kei Selvim?",
+            math.floor(11*s), C.TEXT_DIM, Enum.Font.Gotham,
+            UDim2.new(0, math.floor(10*s), 0, math.floor(48*s)),
+            UDim2.new(1, -math.floor(20*s), 0, math.floor(36*s)),
+            Enum.TextXAlignment.Center)
+
+        local bW = (cW - math.floor(30*s)) / 2
+        local yes = mkButton(confirm, "Ya, Tutup",
+            UDim2.new(0, bW, 0, math.floor(34*s)), C.DANGER, math.floor(11*s))
+        yes.Position = UDim2.new(0, math.floor(10*s), 0, math.floor(104*s))
+        yes.ZIndex = 101
+
+        local no = mkButton(confirm, "Batal",
+            UDim2.new(0, bW, 0, math.floor(34*s)), C.BTN_IDLE, math.floor(11*s))
+        no.Position = UDim2.new(0, math.floor(20*s) + bW, 0, math.floor(104*s))
+        no.ZIndex = 101
 
         no.MouseButton1Click:Connect(function() confirm:Destroy() end)
         yes.MouseButton1Click:Connect(function()
             gui:Destroy()
-            if State.kButton then State.kButton:Destroy() end
+            if State.kBtn then State.kBtn:Destroy() end
         end)
     end)
 
     -- ═══════════ MINIMIZE ═══════════
     minBtn.MouseButton1Click:Connect(function()
         main.Visible = false
-        shadow.Visible = false
-        State.minimized = true
 
-        if not State.kButton or not State.kButton.Parent then
-            local kS = math.floor(52 * s)
+        if not State.kBtn or not State.kBtn.Parent then
+            local kS = math.floor(54*s)
             local k = Instance.new("TextButton")
             k.Name = "KButton"
             k.Size = UDim2.new(0, kS, 0, kS)
-            k.Position = UDim2.new(0, math.floor(20 * s), 0.5, -kS/2)
-            k.BackgroundColor3 = THEME.ACCENT
-            k.BackgroundTransparency = 0.1
+            k.Position = UDim2.new(0, math.floor(20*s), 0.5, -kS/2)
+            k.BackgroundColor3 = C.ACCENT
             k.Text = "K"
-            k.TextColor3 = Color3.fromRGB(255, 255, 255)
+            k.TextColor3 = Color3.fromRGB(255,255,255)
             k.Font = Enum.Font.GothamBold
-            k.TextSize = math.floor(22 * s)
+            k.TextSize = math.floor(24*s)
             k.BorderSizePixel = 0
             k.AutoButtonColor = false
             k.Active = true
@@ -944,25 +604,26 @@ local function buildUI()
             k.ZIndex = 50
             k.Parent = gui
             corner(k, kS/2)
-            stroke(k, THEME.ACCENT_LITE, 1.5, 0.2)
 
             k.MouseButton1Click:Connect(function()
                 main.Visible = true
-                shadow.Visible = true
-                State.minimized = false
                 k.Visible = false
             end)
-            State.kButton = k
+            State.kBtn = k
         end
-        State.kButton.Visible = true
+        State.kBtn.Visible = true
     end)
 
+    -- Init
     switchPage("home")
-    toast("Kei Selvim v3.0 loaded", THEME.SUCCESS)
+    print("[Kei] BUILD OK — all elements created")
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
--- BOOT
+-- BOOT dengan error trace
 -- ═══════════════════════════════════════════════════════════════════════
-task.wait(0.3)
-buildUI()
+task.wait(0.5)
+local ok, err = pcall(build)
+if not ok then
+    warn("[Kei] BUILD FAILED:", err)
+end
