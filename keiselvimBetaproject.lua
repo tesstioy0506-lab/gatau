@@ -1,8 +1,9 @@
 --[[
-    KEI SELVIM — UI SHELL v4.0 (CLEAN & FIXED)
-    - Icon digambar manual pakai Frame (100% render, no unicode glitch)
-    - Layout Home dirombak (anti-kepanjangan)
-    - Sizing & positioning rapi
+    KEI SELVIM — UI SHELL v5.0 (FINAL FIX)
+    - Error 'SetColor' dihilangkan total.
+    - Anti-crash: dibungkus pcall.
+    - Icon vector murni (100% render).
+    - Layout rapi proporsional.
 ]]
 
 local Players          = game:GetService("Players")
@@ -99,7 +100,7 @@ local function label(parent, text, size, color, font, pos, sz, xalign)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
--- VECTOR ICON FACTORY (Dijamin render sempurna)
+-- VECTOR ICON FACTORY (FIXED: Tanpa custom property)
 -- ═══════════════════════════════════════════════════════════════════════
 local function createIcon(parent, type, size, color)
     local holder = Instance.new("Frame")
@@ -111,8 +112,8 @@ local function createIcon(parent, type, size, color)
     holder.Parent = parent
 
     local s = size
-    local t = math.max(2, s * 0.1) -- Ketebalan garis
-    local parts = {}
+    local t = math.max(2, s * 0.1)
+    local parts = {} -- array penampung untuk ganti warna nanti
 
     local function line(w, h, x, y, r)
         local f = Instance.new("Frame")
@@ -129,89 +130,80 @@ local function createIcon(parent, type, size, color)
     end
 
     if type == "home" then
-        -- Atap
         line(s*0.4, t, -s*0.2, -s*0.1, 35)
         line(s*0.4, t, s*0.2, -s*0.1, -35)
-        -- Kotak bawah
         line(t, s*0.35, -s*0.25, s*0.15)
         line(t, s*0.35, s*0.25, s*0.15)
         line(s*0.5, t, 0, s*0.32)
         line(s*0.5, t, 0, -s*0.02)
     elseif type == "tools" then
-        -- Kunci pas
         line(t, s*0.6, -s*0.1, s*0.1, 45)
-        -- Kepala
         local c1 = Instance.new("Frame")
         c1.Size = UDim2.new(0, s*0.3, 0, s*0.3)
         c1.Position = UDim2.new(0.5, s*0.15, 0.5, -s*0.2)
         c1.AnchorPoint = Vector2.new(0.5, 0.5)
         c1.BackgroundTransparency = 1
+        c1.ZIndex = 12
         c1.Parent = holder
         local cs = Instance.new("UIStroke")
         cs.Color = color
         cs.Thickness = t
         cs.Parent = c1
         corner(c1, s*0.15)
-        -- Potong (mask)
+        table.insert(parts, {frame = c1, stroke = cs})
+        
         local mask = Instance.new("Frame")
         mask.Size = UDim2.new(0, s*0.2, 0, s*0.2)
         mask.Position = UDim2.new(0.5, s*0.15, 0.5, -s*0.2)
         mask.AnchorPoint = Vector2.new(0.5, 0.5)
-        mask.BackgroundColor3 = C.BTN_IDLE -- bakal ketiban pas di color
+        mask.BackgroundColor3 = C.BTN_IDLE
         mask.ZIndex = 13
         mask.Parent = holder
         table.insert(parts, mask)
     elseif type == "config" then
-        -- Gear (Ring)
         local ring = Instance.new("Frame")
         ring.Size = UDim2.new(0, s*0.55, 0, s*0.55)
         ring.Position = UDim2.new(0.5, 0, 0.5, 0)
         ring.AnchorPoint = Vector2.new(0.5, 0.5)
         ring.BackgroundTransparency = 1
+        ring.ZIndex = 12
         ring.Parent = holder
         local rs = Instance.new("UIStroke")
         rs.Color = color
         rs.Thickness = t * 1.2
         rs.Parent = ring
         corner(ring, s)
-        -- Dot tengah
+        table.insert(parts, {frame = ring, stroke = rs})
+
         line(s*0.15, s*0.15, 0, 0, 45)
-        -- 4 Gigi
         line(s*0.15, t*1.5, 0, -s*0.3)
         line(s*0.15, t*1.5, 0, s*0.3)
         line(t*1.5, s*0.15, -s*0.3, 0)
         line(t*1.5, s*0.15, s*0.3, 0)
     elseif type == "crown" then
-        -- Dasar
         line(s*0.6, t*1.2, 0, s*0.25)
-        -- 3 Puncak
         line(t*1.5, s*0.35, -s*0.25, -s*0.05)
         line(t*1.5, s*0.35, s*0.25, -s*0.05)
         line(t*1.5, s*0.35, 0, -s*0.15)
     end
 
-    -- Fungsi ganti warna semua elemen ikon
-    holder.SetColor = function(newColor)
-        for _, v in ipairs(parts) do
-            if v:IsA("Frame") then
-                if v:FindFirstChildOfClass("UIStroke") then
-                    v:FindFirstChildOfClass("UIStroke").Color = newColor
-                else
-                    v.BackgroundColor3 = newColor
-                end
+    -- Return holder & array parts, bukan custom function
+    return holder, parts
+end
+
+-- Fungsi untuk mengganti warna ikon dengan aman
+local function colorIcon(parts, newColor)
+    for _, item in ipairs(parts) do
+        if type(item) == "table" and item.stroke then
+            item.stroke.Color = newColor
+        elseif typeof(item) == "Instance" and item:IsA("Frame") then
+            if item:FindFirstChildOfClass("UIStroke") then
+                item:FindFirstChildOfClass("UIStroke").Color = newColor
+            else
+                item.BackgroundColor3 = newColor
             end
         end
-        -- Ring config
-        if type == "config" and holder:FindFirstChildOfClass("Frame") then
-             for _, f in ipairs(holder:GetChildren()) do
-                 if f:FindFirstChildOfClass("UIStroke") then
-                     f:FindFirstChildOfClass("UIStroke").Color = newColor
-                 end
-             end
-        end
     end
-
-    return holder
 end
 
 -- ═══════════════════════════════════════════════════════════════════════
@@ -288,11 +280,9 @@ local function build()
 
     label(header, "◆", math.floor(20*s), C.ACCENT_LITE, Enum.Font.GothamBold,
         UDim2.new(0, math.floor(16*s), 0, 0), UDim2.new(0, math.floor(24*s), 1, 0), Enum.TextXAlignment.Center)
-
     label(header, "KEI SELVIM", math.floor(14*s), C.TEXT, Enum.Font.GothamBold,
         UDim2.new(0, math.floor(46*s), 0, math.floor(HH/2 - 10*s)), UDim2.new(0, math.floor(140*s), 0, math.floor(16*s)))
-
-    label(header, "SHELL v4.0", math.floor(9*s), C.TEXT_DIM, Enum.Font.Gotham,
+    label(header, "SHELL v5.0", math.floor(9*s), C.TEXT_DIM, Enum.Font.Gotham,
         UDim2.new(0, math.floor(47*s), 0, math.floor(HH/2 + 4*s)), UDim2.new(0, math.floor(140*s), 0, math.floor(12*s)))
 
     local badge = Instance.new("Frame")
@@ -303,7 +293,7 @@ local function build()
     badge.ZIndex = 6
     badge.Parent = header
     corner(badge, 10)
-    label(badge, "v4.0", math.floor(9*s), Color3.fromRGB(255,255,255), Enum.Font.GothamBold,
+    label(badge, "v5.0", math.floor(9*s), Color3.fromRGB(255,255,255), Enum.Font.GothamBold,
         UDim2.new(0,0,0,0), UDim2.new(1,0,1,0), Enum.TextXAlignment.Center)
 
     -- Close & Min
@@ -365,7 +355,6 @@ local function build()
 
         label(p, title, math.floor(18*s), C.TEXT, Enum.Font.GothamBold,
             UDim2.new(0, math.floor(16*s), 0, math.floor(14*s)), UDim2.new(1, -math.floor(32*s), 0, math.floor(24*s)))
-
         label(p, subtitle, math.floor(11*s), C.TEXT_DIM, Enum.Font.Gotham,
             UDim2.new(0, math.floor(17*s), 0, math.floor(40*s)), UDim2.new(1, -math.floor(32*s), 0, math.floor(16*s)))
 
@@ -399,6 +388,7 @@ local function build()
     av.ZIndex = 8
     av.Parent = profile
     corner(av, math.floor(26*s))
+    
     task.spawn(function()
         if LocalPlayer then
             local ok, thumb = pcall(function() return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150) end)
@@ -410,10 +400,9 @@ local function build()
         UDim2.new(0, math.floor(76*s), 0, math.floor(16*s)), UDim2.new(1, -math.floor(90*s), 0, math.floor(18*s)))
     label(profile, "@" .. (LocalPlayer and LocalPlayer.Name or "user"), math.floor(11*s), C.TEXT_DIM, Enum.Font.Gotham,
         UDim2.new(0, math.floor(76*s), 0, math.floor(36*s)), UDim2.new(1, -math.floor(90*s), 0, math.floor(14*s)))
-    label(profile, "Kei Selvim • Shell v4.0", math.floor(10*s), C.ACCENT_LITE, Enum.Font.GothamMedium,
+    label(profile, "Kei Selvim • Shell v5.0", math.floor(10*s), C.ACCENT_LITE, Enum.Font.GothamMedium,
         UDim2.new(0, math.floor(76*s), 0, math.floor(54*s)), UDim2.new(1, -math.floor(90*s), 0, math.floor(14*s)))
 
-    -- STATS (Fixed grid)
     local statsFrame = Instance.new("Frame")
     statsFrame.Size = UDim2.new(1, 0, 0, math.floor(146*s))
     statsFrame.Position = UDim2.new(0, 0, 0, math.floor(88*s))
@@ -466,7 +455,13 @@ local function build()
     toolsCard.Parent = toolsBody
     corner(toolsCard, 12)
 
-    createIcon(toolsCard, "tools", math.floor(48*s), C.ACCENT_LITE).Position = UDim2.new(0.5, 0, 0, math.floor(30*s))
+    local toolsIconHolder = Instance.new("Frame")
+    toolsIconHolder.Size = UDim2.new(0, math.floor(48*s), 0, math.floor(48*s))
+    toolsIconHolder.Position = UDim2.new(0.5, 0, 0, math.floor(30*s))
+    toolsIconHolder.BackgroundTransparency = 1
+    toolsIconHolder.Parent = toolsCard
+    createIcon(toolsIconHolder, "tools", math.floor(48*s), C.ACCENT_LITE)
+
     label(toolsCard, "Tools panel — siap diisi logic", math.floor(12*s), C.TEXT_DIM, Enum.Font.Gotham,
         UDim2.new(0, 0, 0, math.floor(80*s)), UDim2.new(1, 0, 0, math.floor(20*s)), Enum.TextXAlignment.Center)
 
@@ -501,7 +496,13 @@ local function build()
     configCard.Parent = configBody
     corner(configCard, 12)
 
-    createIcon(configCard, "config", math.floor(48*s), C.ACCENT_LITE).Position = UDim2.new(0.5, 0, 0, math.floor(30*s))
+    local configIconHolder = Instance.new("Frame")
+    configIconHolder.Size = UDim2.new(0, math.floor(48*s), 0, math.floor(48*s))
+    configIconHolder.Position = UDim2.new(0.5, 0, 0, math.floor(30*s))
+    configIconHolder.BackgroundTransparency = 1
+    configIconHolder.Parent = configCard
+    createIcon(configIconHolder, "config", math.floor(48*s), C.ACCENT_LITE)
+
     label(configCard, "Config panel — siap diisi logic", math.floor(12*s), C.TEXT_DIM, Enum.Font.Gotham,
         UDim2.new(0, 0, 0, math.floor(90*s)), UDim2.new(1, 0, 0, math.floor(20*s)), Enum.TextXAlignment.Center)
 
@@ -515,7 +516,13 @@ local function build()
     crownCard.Parent = crownBody
     corner(crownCard, 12)
 
-    createIcon(crownCard, "crown", math.floor(48*s), C.GOLD).Position = UDim2.new(0.5, 0, 0, math.floor(30*s))
+    local crownIconHolder = Instance.new("Frame")
+    crownIconHolder.Size = UDim2.new(0, math.floor(48*s), 0, math.floor(48*s))
+    crownIconHolder.Position = UDim2.new(0.5, 0, 0, math.floor(30*s))
+    crownIconHolder.BackgroundTransparency = 1
+    crownIconHolder.Parent = crownCard
+    createIcon(crownIconHolder, "crown", math.floor(48*s), C.GOLD)
+
     label(crownCard, "Admin panel — siap diisi logic", math.floor(12*s), C.GOLD, Enum.Font.Gotham,
         UDim2.new(0, 0, 0, math.floor(90*s)), UDim2.new(1, 0, 0, math.floor(20*s)), Enum.TextXAlignment.Center)
 
@@ -541,15 +548,15 @@ local function build()
         corner(btn, 10)
 
         local idleCol = tab.col or C.TEXT_DIM
-        local icon = createIcon(btn, tab.type, math.floor(22*s), idleCol)
+        local holder, parts = createIcon(btn, tab.type, math.floor(22*s), idleCol)
         
-        State.tabs[tab.id] = { btn = btn, icon = icon, idleCol = idleCol }
+        State.tabs[tab.id] = { btn = btn, parts = parts, idleCol = idleCol }
 
         btn.MouseButton1Click:Connect(function()
             for id, data in pairs(State.tabs) do
                 State.pages[id].Visible = (id == tab.id)
                 data.btn.BackgroundColor3 = (id == tab.id) and C.ACCENT or C.BTN_IDLE
-                data.icon.SetColor((id == tab.id) and Color3.fromRGB(255,255,255) or data.idleCol)
+                colorIcon(data.parts, (id == tab.id) and Color3.fromRGB(255,255,255) or data.idleCol)
             end
             State.current = tab.id
         end)
@@ -557,14 +564,14 @@ local function build()
         btn.MouseEnter:Connect(function()
             if State.current ~= tab.id then
                 btn.BackgroundColor3 = C.BTN_HOVER
-                icon.SetColor(C.TEXT)
+                colorIcon(parts, C.TEXT)
             end
         end)
 
         btn.MouseLeave:Connect(function()
             if State.current ~= tab.id then
                 btn.BackgroundColor3 = C.BTN_IDLE
-                icon.SetColor(idleCol)
+                colorIcon(parts, idleCol)
             end
         end)
     end
@@ -651,13 +658,16 @@ local function build()
         State.kBtn.Visible = true
     end)
 
-    -- Init
+    -- Init Page
     for id, data in pairs(State.tabs) do
         State.pages[id].Visible = (id == "home")
         data.btn.BackgroundColor3 = (id == "home") and C.ACCENT or C.BTN_IDLE
-        data.icon.SetColor((id == "home") and Color3.fromRGB(255,255,255) or data.idleCol)
+        colorIcon(data.parts, (id == "home") and Color3.fromRGB(255,255,255) or data.idleCol)
     end
 end
 
 task.wait(0.5)
-pcall(build)
+local success, err = pcall(build)
+if not success then
+    warn("[Kei Selvim] Build Error: " .. tostring(err))
+end
