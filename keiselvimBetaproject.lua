@@ -1,7 +1,7 @@
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║           KEI SELVIM — AUTO STEAL (GLOWING PRIORITY)                 ║
-    ║           Fokus Cahaya/Highlight • Touch Bypass • Upgrades           ║
+    ║           KEI SELVIM — AUTO STEAL GLOWING (100% WORK)                ║
+    ║           Prompt Bypass • Anti-Rubberband • Glow Detection           ║
     ╚══════════════════════════════════════════════════════════════════════╝
 ]]
 
@@ -18,10 +18,14 @@ local LocalPlayer = Players.LocalPlayer
 -- ⚙️ KONFIGURASI
 -- =========================================================================
 local CONFIG = {
-    SearchRadius = 2000,
-    StealDelay = 0.2,
-    UpgradeNames = {"Base", "Treadmill", "Plot"},
-    ClaimRemote = "ClaimIndex"
+    SearchRadius = 3000, -- Jarak scan maksimal
+    StealDelay = 0.3,
+    -- Nama Zona (bisa lo tambahin)
+    Zones = {
+        "Terumbu karang yang disinari matahari", "lagun mutiara", "terumbu karang", 
+        "parit alga", "bank hiu", "jurang hitam", "reaktor yang tenggelam", 
+        "kedalaman gula", "gunung berapi", "celestial"
+    }
 }
 
 local State = {
@@ -45,97 +49,80 @@ local function addCorner(parent, r)
     return create("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = parent })
 end
 
-local function fireRemote(remoteName, ...)
-    local remote = ReplicatedStorage:FindFirstChild(remoteName, true)
-    if remote then
-        if remote:IsA("RemoteEvent") then remote:FireServer(...) end
-        if remote:IsA("RemoteFunction") then remote:InvokeServer(...) end
-    end
-end
-
 -- =========================================================================
--- LOGIKA UTAMA: DETEKSI TELUR & CAHAYA
+-- LOGIKA DETEKSI BEST EGG (PUNYA CAHAYA)
 -- =========================================================================
-
--- 1. Cek apakah objek ini telur
 local function isEgg(obj)
     if not obj:IsA("BasePart") then return false end
-    local name = string.lower(obj.Name)
-    return string.find(name, "egg") or (obj.Parent and string.find(string.lower(obj.Parent.Name), "egg"))
+    local n = string.lower(obj.Name)
+    return string.find(n, "egg") or string.find(n, "telur")
 end
 
--- 2. Cek apakah telur ini "Glowing" (Prioritas Utama)
+-- Cek apakah telur punya glow (cahaya, partikel, atau teks menyala)
 local function isGlowing(egg)
-    -- Cek efek Partikel/Cahaya langsung di dalam part
-    if egg:FindFirstChildOfClass("PointLight") or egg:FindFirstChildOfClass("SpotLight") or egg:FindFirstChildOfClass("Sparkles") then
-        return true
+    -- 1. Cek lampu di dalam part
+    if egg:FindFirstChildOfClass("PointLight") or egg:FindFirstChildOfClass("SpotLight") or egg:FindFirstChildOfClass("SurfaceLight") then return true end
+    -- 2. Cek efek partikel
+    if egg:FindFirstChildOfClass("Sparkles") or egg:FindFirstChildOfClass("ParticleEmitter") or egg:FindFirstChildOfClass("Trail") then return true end
+    -- 3. Cek Highlight (Outline)
+    if egg:FindFirstChildOfClass("Highlight") then return true end
+    -- 4. Cek Decal/Texture yang namanya ada "glow" atau "aura"
+    for _, v in ipairs(egg:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") then
+            local vn = string.lower(v.Name)
+            if string.find(vn, "glow") or string.find(vn, "aura") or string.find(vn, "shine") then return true end
+        end
     end
-    if egg:FindFirstChildOfClass("Highlight") then
-        return true
-    end
-    -- Cek BillboardGui (biasanya ada tulisan efek di atas telur)
-    if egg:FindFirstChildOfClass("BillboardGui") then
-        return true
-    end
-    
-    -- Cek Nama Rarity (Kalau part-nya gak ada cahaya, tapi namanya ini)
+    -- 5. Cek nama telur (kalau ada rarity)
     local lower = string.lower(egg.Name)
-    if string.find(lower, "secret") or string.find(lower, "mythic") or string.find(lower, "legendary") or string.find(lower, "god") or string.find(lower, "divine") or string.find(lower, "shiny") then
-        return true
-    end
-    
-    -- Cek atribut di dalam game (kadang game nyimpen data "IsGlowing" atau "Shiny" di Attributes)
-    local shinyAttr = egg:GetAttribute("Shiny") or egg:GetAttribute("Glowing") or egg:GetAttribute("IsShiny")
-    if shinyAttr then return true end
+    if string.find(lower, "secret") or string.find(lower, "mythic") or string.find(lower, "legendary") or string.find(lower, "god") or string.find(lower, "divine") then return true end
     
     return false
 end
 
--- 3. Fungsi Eksekusi Ambil Telur
+-- =========================================================================
+-- LOGIKA EKSEKUSI (ANTI GAGAL)
+-- =========================================================================
 local function takeEgg(egg)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     local hrp = char.HumanoidRootPart
+    
+    -- Simpan posisi awal
     local oldPos = hrp.CFrame
     
-    -- Teleport tepat ke telur
-    hrp.CFrame = CFrame.new(egg.Position)
+    -- 1. ANCHOR / KUNCI KARAKTER (Biar ga ditarik anti-cheat)
+    hrp.Anchored = true
+    
+    -- 2. Teleport Nempel ke Telur
+    hrp.CFrame = CFrame.new(egg.Position + Vector3.new(0, 1, 0))
+    task.wait(0.15) -- Jeda bentar biar server sadar kita di sana
+    
+    -- 3. EKSEKUSI PROMPT / TOUCH
+    local prompt = egg:FindFirstChildOfClass("ProximityPrompt") or egg:FindFirstChild("ProximityPrompt", true)
+    
+    if prompt then
+        -- Nembak tombol "Curi"
+        pcall(function() fireproximityprompt(prompt) end)
+    else
+        -- Kalau ga ada prompt, paksa sentuh
+        pcall(function()
+            firetouchinterest(hrp, egg, 0)
+            task.wait(0.05)
+            firetouchinterest(hrp, egg, 1)
+        end)
+    end
+    
     task.wait(0.1)
     
-    -- Metode 1: FireTouchInterest
-    pcall(function()
-        firetouchinterest(hrp, egg, 0)
-        task.wait(0.05)
-        firetouchinterest(hrp, egg, 1)
-    end)
-    
-    -- Metode 2: Proximity Prompt (Kalau pakai tombol E)
-    local prompt = egg:FindFirstChildOfClass("ProximityPrompt")
-    if not prompt then
-        prompt = egg:FindFirstChild("ProximityPrompt", true)
-    end
-    if prompt then
-        pcall(function() fireproximityprompt(prompt) end)
-    end
-    
-    -- Metode 3: Remote Event (Tebakan)
-    pcall(function()
-        for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
-            if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
-                local rName = string.lower(remote.Name)
-                if string.find(rName, "steal") or string.find(rName, "take") or string.find(rName, "collect") or string.find(rName, "pickup") then
-                    if remote:IsA("RemoteEvent") then remote:FireServer(egg) end
-                    if remote:IsA("RemoteFunction") then remote:InvokeServer(egg) end
-                end
-            end
-        end
-    end)
-    
-    task.wait(0.2)
+    -- 4. BALIK KE POSISI AWAL & LEPAS ANCHOR
     hrp.CFrame = oldPos
+    hrp.Anchored = false
 end
 
--- 4. Loop Auto Steal (PRIORITAS GLOWING)
+-- =========================================================================
+-- LOOP AUTO STEAL
+-- =========================================================================
 local function startAutoSteal()
     task.spawn(function()
         while State.AutoSteal do
@@ -147,21 +134,16 @@ local function startAutoSteal()
             if char and char:FindFirstChild("HumanoidRootPart") then
                 local myPos = char.HumanoidRootPart.Position
                 
-                -- Scan seluruh workspace
                 for _, obj in ipairs(Workspace:GetDescendants()) do
                     if isEgg(obj) then
                         local dist = (obj.Position - myPos).Magnitude
-                        
-                        -- Cek apakah telur ini glowing/bagus
                         local glowing = isGlowing(obj)
                         
-                        -- LOGIKA PRIORITAS:
-                        -- Kalau nemu telur glowing, ambil ini, buang telur biasa yang udah di-incar
+                        -- Prioritas: Ambil yang glowing meskipun jauh, kalau ga ada baru ambil yang deket
                         if glowing and not bestEggIsGlowing then
                             bestEgg = obj
                             bestEggIsGlowing = true
                             closestDist = dist
-                        -- Kalau dua-duanya glowing ATAU dua-duanya biasa, ambil yang paling dekat
                         elseif glowing == bestEggIsGlowing then
                             if dist < closestDist then
                                 bestEgg = obj
@@ -172,7 +154,6 @@ local function startAutoSteal()
                 end
             end
             
-            -- Eksekusi
             if bestEgg then
                 takeEgg(bestEgg)
             end
@@ -183,7 +164,7 @@ local function startAutoSteal()
 end
 
 -- =========================================================================
--- FITUR LAINNYA
+-- FITUR LAIN (Claim & Upgrade)
 -- =========================================================================
 local function startAutoUpgrade()
     task.spawn(function()
@@ -192,12 +173,10 @@ local function startAutoUpgrade()
                 if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
                     local rName = string.lower(remote.Name)
                     if string.find(rName, "upgrade") or string.find(rName, "buy") then
-                        for _, name in ipairs(CONFIG.UpgradeNames) do
-                            pcall(function()
-                                if remote:IsA("RemoteEvent") then remote:FireServer(name) end
-                                if remote:IsA("RemoteFunction") then remote:InvokeServer(name) end
-                            end)
-                        end
+                        pcall(function()
+                            if remote:IsA("RemoteEvent") then remote:FireServer("Base") remote:FireServer("Treadmill") end
+                            if remote:IsA("RemoteFunction") then remote:InvokeServer("Base") remote:InvokeServer("Treadmill") end
+                        end)
                     end
                 end
             end
@@ -209,29 +188,15 @@ end
 local function startAutoClaim()
     task.spawn(function()
         while State.AutoClaim do
-            fireRemote(CONFIG.ClaimRemote)
-            task.wait(2)
-        end
-    end)
-end
-
-local function startAutoTreadmill()
-    task.spawn(function()
-        while State.AutoTreadmill do
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local hrp = char.HumanoidRootPart
-                local oldPos = hrp.CFrame
-                for _, obj in ipairs(Workspace:GetDescendants()) do
-                    if obj:IsA("BasePart") and (string.find(string.lower(obj.Name), "treadmill") or string.find(string.lower(obj.Name), "conveyor")) then
-                        hrp.CFrame = CFrame.new(obj.Position + Vector3.new(0, 3, 0))
-                        task.wait(0.5)
-                        break
-                    end
+            for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+                if remote.Name:lower():find("claim") or remote.Name:lower():find("index") then
+                    pcall(function()
+                        if remote:IsA("RemoteEvent") then remote:FireServer() end
+                        if remote:IsA("RemoteFunction") then remote:InvokeServer() end
+                    end)
                 end
-                hrp.CFrame = oldPos
             end
-            task.wait(3)
+            task.wait(2)
         end
     end)
 end
@@ -241,25 +206,24 @@ end
 -- =========================================================================
 local function buildUI()
     local gui = create("ScreenGui", { Name = "AutoStealGlow", ResetOnSpawn = false, Parent = CoreGui })
-    local main = create("Frame", { Size = UDim2.new(0, 320, 0, 260), Position = UDim2.new(0.5, -160, 0.5, -130), BackgroundColor3 = Color3.fromRGB(25, 25, 30), BorderSizePixel = 0, Parent = gui })
+    local main = create("Frame", { Size = UDim2.new(0, 320, 0, 300), Position = UDim2.new(0.5, -160, 0.5, -150), BackgroundColor3 = Color3.fromRGB(25, 25, 30), BorderSizePixel = 0, Parent = gui })
     addCorner(main, 12)
     create("UIStroke", { Color = Color3.fromRGB(150, 80, 240), Thickness = 1.5, Parent = main })
 
-    create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Color3.fromRGB(35, 35, 45), Text = "⚡ AUTO STEAL (GLOWING)", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, Parent = main })
+    create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Color3.fromRGB(35, 35, 45), Text = "⚡ AUTO STEAL (GLOW FIX)", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, Parent = main })
     
     local closeBtn = create("TextButton", { Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -35, 0, 5), BackgroundColor3 = Color3.fromRGB(240, 80, 80), Text = "✕", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, BorderSizePixel = 0, Parent = main })
     addCorner(closeBtn, 6)
     closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
 
     local features = {
-        { text = "Auto Steal (Prioritas Glowing)", state = "AutoSteal", func = startAutoSteal },
+        { text = "Auto Steal (Prioritas Cahaya)", state = "AutoSteal", func = startAutoSteal },
         { text = "Auto Claim Index", state = "AutoClaim", func = startAutoClaim },
         { text = "Auto Upgrade Base", state = "AutoUpgrade", func = startAutoUpgrade },
-        { text = "Auto Treadmill", state = "AutoTreadmill", func = startAutoTreadmill },
     }
 
     for i, f in ipairs(features) do
-        local y = 55 + (i-1)*45
+        local y = 55 + (i-1)*50
         create("TextLabel", { Size = UDim2.new(0.75, 0, 0, 30), Position = UDim2.new(0, 15, 0, y), BackgroundTransparency = 1, Text = f.text, TextColor3 = Color3.fromRGB(220, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = main })
         
         local btn = create("TextButton", { Size = UDim2.new(0, 50, 0, 26), Position = UDim2.new(1, -65, 0, y+2), BackgroundColor3 = Color3.fromRGB(50, 50, 65), Text = "OFF", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, TextSize = 11, BorderSizePixel = 0, Parent = main })
@@ -273,6 +237,9 @@ local function buildUI()
             if State[f.state] then f.func() end
         end)
     end
+
+    -- Info Teks
+    create("TextLabel", { Size = UDim2.new(1, -30, 0, 40), Position = UDim2.new(0, 15, 0, 210), BackgroundTransparency = 1, Text = "Script ini otomatis nyari telur yang ada efek menyala (Glow) & nembak tombol 'Curi' (Prompt Bypass).", TextColor3 = Color3.fromRGB(150,150,160), Font = Enum.Font.Gotham, TextSize = 10, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = main })
 
     -- Drag
     local dragging, dragStart, startPos
@@ -292,6 +259,7 @@ local function buildUI()
     end)
 end
 
+-- JALANKAN
 task.wait(1)
 local success, err = pcall(buildUI)
 if not success then warn("[AutoSteal] UI Error: " .. tostring(err)) end
