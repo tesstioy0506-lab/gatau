@@ -1,7 +1,7 @@
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║           KEI SELVIM — KOTA GUI v17.0                                ║
-    ║           Modern Box UI • Toggle Features • Live Coordinate          ║
+    ║           KEI SELVIM — KOTA GUI v17.1                                ║
+    ║           Modern Box UI • Decimal Coordinates • Toggle Features      ║
     ╚══════════════════════════════════════════════════════════════════════╝
 ]]
 
@@ -191,23 +191,26 @@ local function buildUI()
     addCorner(closeBtn, 6)
     closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
 
-    -- Live Coordinate Display (Kota-style box)
+    -- Live Coordinate Display
     local coordBox = create("Frame", { Size = UDim2.new(1, -20, 0, 45), Position = UDim2.new(0, 10, 0, 50), BackgroundColor3 = C.BOX, BorderSizePixel = 0, Parent = main })
     addCorner(coordBox, 6); addStroke(coordBox, C.BORDER)
     
-    local coordLbl = create("TextLabel", { Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = "📍 X: 0 | Y: 0 | Z: 0", TextColor3 = C.DIM, Font = Enum.Font.Code, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = coordBox })
+    local coordLbl = create("TextLabel", { Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = "📍 0.00, 0.00, 0.00", TextColor3 = C.DIM, Font = Enum.Font.Code, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, Parent = coordBox })
 
-    -- Spawn Tracker Loop buat update koordinat di UI
+    -- Spawn Tracker Loop
     task.spawn(function()
         while gui.Parent do
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 local pos = char.HumanoidRootPart.Position
                 local status = (pos - State.LastPos).Magnitude > 2 and "🟢" or "🔴"
-                coordLbl.Text = string.format("%s X: %d | Y: %d | Z: %d", status, math.floor(pos.X), math.floor(pos.Y), math.floor(pos.Z))
+                
+                -- FORMAT: 2 angka di belakang koma (Contoh: -87.02, 3.75, -180.10)
+                coordLbl.Text = string.format("%s %.2f, %.2f, %.2f", status, pos.X, pos.Y, pos.Z)
+                
                 State.LastPos = pos
             end
-            task.wait(0.5)
+            task.wait(0.2)
         end
     end)
 
@@ -255,7 +258,7 @@ local function buildUI()
 end
 
 -- =========================================================================
--- EVENT LISTENER (AUTO DETECT TELUR SPAWN)
+-- EVENT LISTENER
 -- =========================================================================
 Workspace.DescendantAdded:Connect(function(obj)
     if State.IsProcessing or not State.AutoSteal then return end
