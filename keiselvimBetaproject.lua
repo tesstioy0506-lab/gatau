@@ -1,7 +1,7 @@
 --[[
     ╔══════════════════════════════════════════════════════════════════════╗
-    ║           KEI SELVIM — GOD TIER STEALER (v16.0)                      ║
-    ║           Auto Safe Zone • Egg Predictor • Secret/Divine Only        ║
+    ║           KEI SELVIM — KOTA GUI v17.0                                ║
+    ║           Modern Box UI • Toggle Features • Live Coordinate          ║
     ╚══════════════════════════════════════════════════════════════════════╝
 ]]
 
@@ -15,24 +15,39 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- =========================================================================
--- ⚙️ KONFIGURASI
+-- ⚙️ KONFIGURASI & STATE
 -- =========================================================================
 local CONFIG = {
-    SearchRadius = 5000, 
-    StealDelay = 0.4,
-    RarityKeywords = {"secret", "eternal", "divine"},
-    SafeZoneKeyword = "zona aman" -- Nama objek zona aman di game lo
+    GoodKeywords = {"secret", "eternal", "divine", "mythic", "legendary"},
+    SafeZoneKeyword = "zona aman",
+    StealDelay = 0.4
 }
 
 local State = {
     AutoSteal = false,
+    AutoSafeZone = true,
     AutoClaim = false,
     AutoUpgrade = false,
+    IsProcessing = false,
+    ActiveEggs = {},
+    LastPos = Vector3.zero
 }
 
 -- =========================================================================
--- HELPER UI
+-- HELPER UI (Desain Kota Minimalis)
 -- =========================================================================
+local C = {
+    BG      = Color3.fromRGB(20, 20, 24),
+    PANEL   = Color3.fromRGB(28, 28, 34),
+    BOX     = Color3.fromRGB(18, 18, 20),
+    TEXT    = Color3.fromRGB(240, 240, 240),
+    DIM     = Color3.fromRGB(150, 150, 160),
+    ACCENT  = Color3.fromRGB(90, 90, 255),
+    GREEN   = Color3.fromRGB(100, 220, 150),
+    RED     = Color3.fromRGB(240, 80, 80),
+    BORDER  = Color3.fromRGB(50, 50, 60)
+}
+
 local function create(cls, props)
     local obj = Instance.new(cls)
     for k, v in pairs(props) do if k ~= "Parent" then obj[k] = v end end
@@ -41,131 +56,51 @@ local function create(cls, props)
 end
 
 local function addCorner(parent, r)
-    return create("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = parent })
+    return create("UICorner", { CornerRadius = UDim.new(0, r or 6), Parent = parent })
+end
+
+local function addStroke(parent, col)
+    return create("UIStroke", { Color = col or C.BORDER, Thickness = 1, Parent = parent })
 end
 
 -- =========================================================================
--- 🧠 FITUR BARU: EGG PREDICTOR (100% AKURAT)
+-- 🧠 FUNGSI DETEKSI
 -- =========================================================================
--- Logika: Game biasanya nyimpen antrean telur di Attributes atau Variables.
--- Script ini bakal ngebaca list tersebut dan nampilin di UI.
-local function updatePrediction(uiLabel)
-    local nextEgg = "Menunggu Spawn..."
-    
-    -- Metode 1: Cek Attributes di Workspace atau ReplicatedStorage
-    local rs = ReplicatedStorage
-    for _, obj in ipairs(rs:GetChildren()) do
-        if obj:IsA("StringValue") and (string.find(string.lower(obj.Name), "next") or string.find(string.lower(obj.Name), "queue")) then
-            nextEgg = obj.Value
-            break
-        end
-        local attr = obj:GetAttribute("NextEgg") or obj:GetAttribute("EggQueue")
-        if attr then nextEgg = tostring(attr) break end
-    end
-    
-    -- Metode 2: Cek local player attributes (kadang game nyimpen di sini)
-    local playerAttr = LocalPlayer:GetAttribute("NextEgg")
-    if playerAttr then nextEgg = tostring(playerAttr) end
-
-    -- Update UI
-    if uiLabel then
-        uiLabel.Text = "🔮 Next Egg: " .. nextEgg
-        if string.find(string.lower(nextEgg), "secret") or string.find(string.lower(nextEgg), "divine") or string.find(string.lower(nextEgg), "eternal") then
-            uiLabel.TextColor3 = Color3.fromRGB(255, 200, 50) -- Emas kalau telur bagus
-        else
-            uiLabel.TextColor3 = Color3.fromRGB(200, 200, 200) -- Abu kalau biasa
-        end
-    end
-end
-
--- =========================================================================
--- LOGIKA DETEKSI
--- =========================================================================
-local function isEgg(obj)
-    if not obj:IsA("BasePart") then return false end
-    local n = string.lower(obj.Name)
-    return string.find(n, "egg") or string.find(n, "telur")
-end
-
 local function isBestEgg(obj)
-    -- Cek Efek Visual (Lampu, Partikel)
-    if obj:FindFirstChildOfClass("PointLight") or obj:FindFirstChildOfClass("SpotLight") or obj:FindFirstChildOfClass("SurfaceLight") then return true end
-    if obj:FindFirstChildOfClass("Sparkles") or obj:FindFirstChildOfClass("ParticleEmitter") or obj:FindFirstChildOfClass("Highlight") then return true end
-    for _, v in ipairs(obj:GetDescendants()) do
-        if v:IsA("ParticleEmitter") or v:IsA("PointLight") then return true end
-    end
-
-    -- Cek Nama
+    if not obj:IsA("BasePart") and not obj:IsA("Model") then return false end
     local lowerName = string.lower(obj.Name)
-    for _, keyword in ipairs(CONFIG.RarityKeywords) do
-        if string.find(lowerName, keyword) then return true end
+    for _, k in ipairs(CONFIG.GoodKeywords) do if string.find(lowerName, k) then return true end end
+    
+    local rarity = obj:GetAttribute("Rarity") or obj:GetAttribute("RarityName")
+    if rarity then
+        local lowerRarity = string.lower(tostring(rarity))
+        for _, k in ipairs(CONFIG.GoodKeywords) do if string.find(lowerRarity, k) then return true end end
     end
     
-    -- Cek Prompt Text
-    local prompt = obj:FindFirstChildOfClass("ProximityPrompt") or obj:FindFirstChild("ProximityPrompt", true)
-    if prompt then
-        local objText = string.lower(prompt.ObjectText or "")
-        for _, keyword in ipairs(CONFIG.RarityKeywords) do
-            if string.find(objText, keyword) then return true end
-        end
+    if obj:FindFirstChildOfClass("PointLight") or obj:FindFirstChildOfClass("Highlight") then return true end
+    for _, v in ipairs(obj:GetChildren()) do
+        if v:IsA("ParticleEmitter") or v:IsA("PointLight") then return true end
     end
     return false
 end
 
 -- =========================================================================
--- 🏃‍♂️ FITUR BARU: AUTO SAFE ZONE (KLAIM OTOMATIS)
+-- 🏃‍♂️ FUNGSI EKSEKUSI
 -- =========================================================================
-local function goToSafeZone()
+local function processEgg(egg)
+    if State.IsProcessing then return end
+    State.IsProcessing = true
+    
     local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    if not char or not char:FindFirstChild("HumanoidRootPart") then State.IsProcessing = false return end
     local hrp = char.HumanoidRootPart
     local oldPos = hrp.CFrame
     
-    -- Cari lokasi Zona Aman
-    local safeZonePart = nil
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and string.find(string.lower(obj.Name), CONFIG.SafeZoneKeyword) then
-            safeZonePart = obj
-            break
-        end
-    end
-    
-    if safeZonePart then
-        -- Teleport ke Zona Aman
-        hrp.CFrame = CFrame.new(safeZonePart.Position + Vector3.new(0, 3, 0))
-        task.wait(0.8) -- Jeda biar telur ke-klaim / masuk ke inventory
-        hrp.CFrame = oldPos
-    else
-        -- Kalau ga nemu part bernama "Zona Aman", coba cari tulisan di SurfaceGui/TextLabel
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if (obj:IsA("TextLabel") or obj:IsA("SurfaceGui")) and string.find(string.lower(obj.Text or ""), "zona aman") then
-                local parentPart = obj.Parent
-                if parentPart:IsA("BasePart") then
-                    hrp.CFrame = CFrame.new(parentPart.Position + Vector3.new(0, 3, 0))
-                    task.wait(0.8)
-                    hrp.CFrame = oldPos
-                    return
-                end
-            end
-        end
-    end
-end
-
--- =========================================================================
--- EKSEKUSI STEAL
--- =========================================================================
-local function takeEgg(egg)
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = char.HumanoidRootPart
-    local oldPos = hrp.CFrame
-    
-    -- Teleport ke telur
+    print("[🔥 BEST EGG] Ditemukan: " .. egg.Name)
     hrp.CFrame = CFrame.new(egg.Position + Vector3.new(0, 2, 0))
-    task.wait(0.25)
+    task.wait(0.2)
     
     local prompt = egg:FindFirstChildOfClass("ProximityPrompt") or egg:FindFirstChild("ProximityPrompt", true)
-    
     if prompt then
         pcall(function() fireproximityprompt(prompt) end)
     else
@@ -175,54 +110,49 @@ local function takeEgg(egg)
             firetouchinterest(hrp, egg, 1)
         end)
     end
-    
-    task.wait(0.15)
-    -- Balik ke posisi awal dulu
+    task.wait(0.1)
     hrp.CFrame = oldPos
     task.wait(0.2)
     
-    -- LANGSUNG KE ZONA AMAN BIAR DIKLAIM
-    goToSafeZone()
+    -- Zona Aman
+    if State.AutoSafeZone then
+        local safeZone = nil
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and string.find(string.lower(obj.Name), CONFIG.SafeZoneKeyword) then
+                safeZone = obj
+                break
+            end
+        end
+        if safeZone then
+            hrp.CFrame = CFrame.new(safeZone.Position + Vector3.new(0, 2, 0))
+            task.wait(0.8)
+            hrp.CFrame = oldPos
+        end
+    end
+    State.IsProcessing = false
 end
 
--- =========================================================================
--- LOOP AUTO STEAL
--- =========================================================================
 local function startAutoSteal()
     task.spawn(function()
         while State.AutoSteal do
             local bestEgg = nil
-            local closestDist = CONFIG.SearchRadius
-            
+            local closestDist = 5000
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 local myPos = char.HumanoidRootPart.Position
-                
                 for _, obj in ipairs(Workspace:GetDescendants()) do
-                    if isEgg(obj) then
-                        if isBestEgg(obj) then
-                            local dist = (obj.Position - myPos).Magnitude
-                            if dist < closestDist then
-                                bestEgg = obj
-                                closestDist = dist
-                            end
-                        end
+                    if isBestEgg(obj) then
+                        local dist = (obj.Position - myPos).Magnitude
+                        if dist < closestDist then bestEgg = obj; closestDist = dist end
                     end
                 end
             end
-            
-            if bestEgg then
-                takeEgg(bestEgg)
-            end
-            
+            if bestEgg then processEgg(bestEgg) end
             task.wait(CONFIG.StealDelay)
         end
     end)
 end
 
--- =========================================================================
--- FITUR LAIN (UPGRADE)
--- =========================================================================
 local function startAutoUpgrade()
     task.spawn(function()
         while State.AutoUpgrade do
@@ -243,64 +173,77 @@ local function startAutoUpgrade()
 end
 
 -- =========================================================================
--- BUILD UI
+-- 🎨 BUILD GUI
 -- =========================================================================
 local function buildUI()
-    local gui = create("ScreenGui", { Name = "GodTierStealer", ResetOnSpawn = false, Parent = CoreGui })
-    local main = create("Frame", { Size = UDim2.new(0, 340, 0, 310), Position = UDim2.new(0.5, -170, 0.5, -155), BackgroundColor3 = Color3.fromRGB(25, 25, 30), BorderSizePixel = 0, Parent = gui })
-    addCorner(main, 12)
-    create("UIStroke", { Color = Color3.fromRGB(150, 80, 240), Thickness = 1.5, Parent = main })
-
-    create("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = Color3.fromRGB(35, 35, 45), Text = "⚡ GOD TIER STEALER (V16)", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.GothamBold, TextSize = 14, BorderSizePixel = 0, Parent = main })
+    local gui = create("ScreenGui", { Name = "KotaUI", ResetOnSpawn = false, Parent = CoreGui })
     
-    local closeBtn = create("TextButton", { Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -35, 0, 5), BackgroundColor3 = Color3.fromRGB(240, 80, 80), Text = "✕", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, BorderSizePixel = 0, Parent = main })
+    -- Main Frame
+    local main = create("Frame", { Size = UDim2.new(0, 280, 0, 300), Position = UDim2.new(0.5, -140, 0.5, -150), BackgroundColor3 = C.BG, BorderSizePixel = 0, Parent = gui })
+    addCorner(main, 10); addStroke(main, C.BORDER)
+
+    -- Header
+    local header = create("Frame", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = C.PANEL, BorderSizePixel = 0, Parent = main })
+    addCorner(header, 10)
+    create("TextLabel", { Size = UDim2.new(1, -40, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "KEI SELVIM", TextColor3 = C.TEXT, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, Parent = header })
+    
+    local closeBtn = create("TextButton", { Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -32, 0, 8), BackgroundColor3 = C.RED, Text = "✕", TextColor3 = C.TEXT, Font = Enum.Font.GothamBold, TextSize = 12, BorderSizePixel = 0, Parent = header })
     addCorner(closeBtn, 6)
     closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
 
-    -- PREDICTOR LABEL
-    local predLabel = create("TextLabel", { Size = UDim2.new(1, -20, 0, 30), Position = UDim2.new(0, 10, 0, 45), BackgroundColor3 = Color3.fromRGB(15, 15, 18), Text = "🔮 Next Egg: Menghitung...", TextColor3 = Color3.fromRGB(255, 200, 50), Font = Enum.Font.GothamBold, TextSize = 12, BorderSizePixel = 0, Parent = main })
-    addCorner(predLabel, 6)
+    -- Live Coordinate Display (Kota-style box)
+    local coordBox = create("Frame", { Size = UDim2.new(1, -20, 0, 45), Position = UDim2.new(0, 10, 0, 50), BackgroundColor3 = C.BOX, BorderSizePixel = 0, Parent = main })
+    addCorner(coordBox, 6); addStroke(coordBox, C.BORDER)
+    
+    local coordLbl = create("TextLabel", { Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 10, 0, 0), BackgroundTransparency = 1, Text = "📍 X: 0 | Y: 0 | Z: 0", TextColor3 = C.DIM, Font = Enum.Font.Code, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = coordBox })
 
-    -- Loop Prediksi Tiap 0.5 Detik
+    -- Spawn Tracker Loop buat update koordinat di UI
     task.spawn(function()
         while gui.Parent do
-            updatePrediction(predLabel)
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local pos = char.HumanoidRootPart.Position
+                local status = (pos - State.LastPos).Magnitude > 2 and "🟢" or "🔴"
+                coordLbl.Text = string.format("%s X: %d | Y: %d | Z: %d", status, math.floor(pos.X), math.floor(pos.Y), math.floor(pos.Z))
+                State.LastPos = pos
+            end
             task.wait(0.5)
         end
     end)
 
+    -- Fitur Toggles
     local features = {
-        { text = "Auto Steal (Divine+)", state = "AutoSteal", func = startAutoSteal },
-        { text = "Auto Upgrade Base", state = "AutoUpgrade", func = startAutoUpgrade },
+        { text = "Auto Steal (Best Egg)", state = "AutoSteal", func = startAutoSteal, y = 110 },
+        { text = "Auto Safe Zone (Klaim)", state = "AutoSafeZone", y = 150, defaultOn = true },
+        { text = "Auto Upgrade Base", state = "AutoUpgrade", func = startAutoUpgrade, y = 190 },
     }
 
-    for i, f in ipairs(features) do
-        local y = 85 + (i-1)*50
-        create("TextLabel", { Size = UDim2.new(0.75, 0, 0, 30), Position = UDim2.new(0, 15, 0, y), BackgroundTransparency = 1, Text = f.text, TextColor3 = Color3.fromRGB(220, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = main })
+    for _, f in ipairs(features) do
+        local row = create("Frame", { Size = UDim2.new(1, -20, 0, 30), Position = UDim2.new(0, 10, 0, f.y), BackgroundTransparency = 1, Parent = main })
+        create("TextLabel", { Size = UDim2.new(0.7, 0, 1, 0), BackgroundTransparency = 1, Text = f.text, TextColor3 = C.TEXT, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
         
-        local btn = create("TextButton", { Size = UDim2.new(0, 50, 0, 26), Position = UDim2.new(1, -65, 0, y+2), BackgroundColor3 = Color3.fromRGB(50, 50, 65), Text = "OFF", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, TextSize = 11, BorderSizePixel = 0, Parent = main })
-        addCorner(btn, 6)
+        local btn = create("TextButton", { Size = UDim2.new(0, 45, 0, 24), Position = UDim2.new(1, -45, 0, 3), BackgroundColor3 = f.defaultOn and C.GREEN or C.BOX, Text = f.defaultOn and "ON" or "OFF", TextColor3 = C.TEXT, Font = Enum.Font.GothamBold, TextSize = 11, BorderSizePixel = 0, Parent = row })
+        addCorner(btn, 6); addStroke(btn, C.BORDER)
         
         btn.MouseButton1Click:Connect(function()
             State[f.state] = not State[f.state]
             btn.Text = State[f.state] and "ON" or "OFF"
-            btn.BackgroundColor3 = State[f.state] and Color3.fromRGB(100, 220, 150) or Color3.fromRGB(50, 50, 65)
-            btn.TextColor3 = State[f.state] and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
-            if State[f.state] then f.func() end
+            btn.BackgroundColor3 = State[f.state] and C.GREEN or C.BOX
+            if State[f.state] and f.func then f.func() end
         end)
     end
 
-    -- Info Box
-    create("TextLabel", { Size = UDim2.new(1, -30, 0, 60), Position = UDim2.new(0, 15, 0, 200), BackgroundTransparency = 1, Text = "Auto Safe Zone: Setelah nyuri, karakter otomatis lari ke 'Zona Aman' biar telurnya ke-klaim.", TextColor3 = Color3.fromRGB(150,150,160), Font = Enum.Font.Gotham, TextSize = 10, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = main })
+    -- Footer Info
+    create("TextLabel", { Size = UDim2.new(1, -20, 0, 30), Position = UDim2.new(0, 10, 1, -40), BackgroundTransparency = 1, Text = "Script by Kei Selvim", TextColor3 = C.DIM, Font = Enum.Font.Gotham, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, Parent = main })
 
-    -- Drag
+    -- Drag Logic
     local dragging, dragStart, startPos
-    main.InputBegan:Connect(function(input)
+    header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true; dragStart = input.Position; startPos = main.Position
         end
     end)
-    main.InputChanged:Connect(function(input)
+    header.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local d = input.Position - dragStart
             main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
@@ -311,7 +254,23 @@ local function buildUI()
     end)
 end
 
--- JALANKAN
+-- =========================================================================
+-- EVENT LISTENER (AUTO DETECT TELUR SPAWN)
+-- =========================================================================
+Workspace.DescendantAdded:Connect(function(obj)
+    if State.IsProcessing or not State.AutoSteal then return end
+    if isBestEgg(obj) then
+        if not State.ActiveEggs[obj] then
+            State.ActiveEggs[obj] = true
+            task.spawn(function()
+                processEgg(obj)
+                State.ActiveEggs[obj] = nil
+            end)
+        end
+    end
+end)
+
+-- JALANKAN UI
 task.wait(1)
 local success, err = pcall(buildUI)
-if not success then warn("[AutoSteal] UI Error: " .. tostring(err)) end
+if not success then warn("[Kota UI] Error: " .. tostring(err)) end
